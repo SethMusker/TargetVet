@@ -14,7 +14,7 @@ filterTargets<-function(cov,target,filterParalogs,out){
             group_by(ID) %>%
             summarise(median_cov=median(coverage),
                         sd_cov=round(sd(coverage),1)) %>%
-            arrange(desc(median_cov)) %>%
+            arrange(dplyr::desc(median_cov)) %>%
             mutate(ID = fct_reorder(ID, dplyr::desc(median_cov)))
         incov_summary[[i]]$ord<-c(1:nrow(incov_summary[[i]]))
         myseg<-segmented(lm(median_cov~ord,data=incov_summary[[i]]),npsi=2)
@@ -26,10 +26,27 @@ filterTargets<-function(cov,target,filterParalogs,out){
         } else {
             mychosen[[i]]<-incov_summary[[i]] %>% dplyr::filter(median_cov >= breakpoint_low_mc, median_cov <= breakpoint_high_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
         }
+        ## make plots
+        incov_summary[[i]]$segment_line<-predict(myseg)
+        incov_summary[[i]]$segment_line[incov_summary[[i]]$segment_line < 0]<-0
+        myplot<-ggplot(incov_summary[[i]])+
+            geom_col(aes(x=ID,y=median_cov,fill=sd_cov))+
+            scale_fill_viridis_c("Coverage SD")+
+            theme(axis.text.x  = element_text(angle=90,size=5.5))+
+            scale_y_continuous(n.breaks = 25)+
+            geom_hline(yintercept = breakpoint_high_mc,colour="red")+
+            geom_hline(yintercept = breakpoint_low_mc,colour="red")+
+            geom_line(aes(x=ord,y=segment_line),size=1,colour="green",alpha=0.8)+
+            ylim(c(0,max(incov_summary[[i]]$median_cov)))+
+            ylab("Median Coverage")
+        ggsave(paste0(i,".pdf"),plot=myplot,width=25,height=20,units="cm")
+
     }
     mychosen_intersect<-Reduce(intersect, mychosen)
+    mychosen_outersect<-incov_summary[[i]]$ID[! incov_summary[[i]]$ID %in% mychosen_intersect]
     cat("Filtering kept",length(mychosen_intersect),"out of",length(incov_summary[[i]]$ID),"targets")
     write.table(data.frame(ID=mychosen_intersect),paste0(out,".kept"),col.names=F,row.names=F,quote=F)
+    write.table(data.frame(ID=mychosen_outersect),paste0(out,".removed"),col.names=F,row.names=F,quote=F)
     myout_target<-readDNAStringSet(target)[mychosen_intersect]
     writeXStringSet(myout_target,out)
 }
