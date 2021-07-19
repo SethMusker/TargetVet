@@ -12,13 +12,14 @@ F) READS1=${OPTARG};;
 R) READS2=${OPTARG};;
 T) TARGET=${OPTARG};;
 n) threads=${OPTARG};;
+q) map_qual=${OPTARG};;
 
 esac
 done
 
 bwa index ${TARGET}
-bwa mem -t ${threads} ${TARGET} ${READS1} ${READS2} | samtools view -@ ${threads} -F 4 -q 20 -b | samtools sort > `basename ${READS1} .gz`_to_${TARGET}.sorted.bam
-BAM=`basename ${READS1} .gz`_to_${TARGET}.sorted.bam
+BAM=`basename ${READS1} .gz`_to_`basename ${TARGET}`.sorted.bam
+bwa mem -t ${threads} ${TARGET} ${READS1} ${READS2} | samtools view -@ ${threads} -F 4 -q ${map_qual} -b | samtools sort > ${BAM}
 samtools index ${BAM}
 
 samtools depth -a ${BAM} > ${BAM}.coverage

@@ -1,18 +1,15 @@
 #!/bin/Rscript
-suppressMessages(suppressWarnings(require(optparse)))
-
 filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_median=NULL){
   if(method == "sd"){method<-"SD"}
   cov <- unlist(strsplit(cov, ","))
   incov<-list()
   incov_summary<-list()
-  mychosen<-list()
-  my_highcov<-list()
-  my_lowcov<-list()
+  chosen<-list()
+  highcov<-list()
+  lowcov<-list()
   for(i in cov){
       incov[[i]]<-read.table(i,stringsAsFactors = T,header=F)
       names(incov[[i]])<-c("ID","pos","coverage")
-      ## breakpoint analysis
         incov_summary[[i]]<-incov[[i]] %>%
             group_by(ID) %>%
             summarise(median_cov=median(coverage),
@@ -20,8 +17,9 @@ filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_medi
             arrange(dplyr::desc(median_cov)) %>%
             mutate(ID = fct_reorder(ID, dplyr::desc(median_cov)))
         incov_summary[[i]]$ord<-c(1:nrow(incov_summary[[i]]))
-        
+        write.table(incov_summary[[i]],paste0(i,"_summary.txt"),row.names=F,quote=F)
         if(method=="breakpoint"){
+          ## breakpoint analysis
           myseg<-segmented(lm(median_cov~ord,data=incov_summary[[i]]),npsi=2)
           breakpoint_high_mc<-as.numeric(incov_summary[[i]][floor(myseg$psi[1,2]),"median_cov"])
           breakpoint_low_mc<-as.numeric(incov_summary[[i]][ceiling(myseg$psi[2,2]),"median_cov"])
@@ -39,9 +37,9 @@ filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_medi
 
         cat("Cut-off values for", i,": \nupper median coverage =",breakpoint_high_mc,"\nlower median coverage =",breakpoint_low_mc,"\n")
             
-        mychosen[[i]]<-  incov_summary[[i]] %>% dplyr::filter(median_cov >= breakpoint_low_mc, median_cov <= breakpoint_high_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
-        my_highcov[[i]]<-incov_summary[[i]] %>% dplyr::filter(median_cov > breakpoint_high_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
-        my_lowcov[[i]]<- incov_summary[[i]] %>% dplyr::filter(median_cov < breakpoint_low_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
+        chosen[[i]]<-  incov_summary[[i]] %>% dplyr::filter(median_cov >= breakpoint_low_mc, median_cov <= breakpoint_high_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
+        highcov[[i]]<-incov_summary[[i]] %>% dplyr::filter(median_cov > breakpoint_high_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
+        lowcov[[i]]<- incov_summary[[i]] %>% dplyr::filter(median_cov < breakpoint_low_mc) %>% select(ID) %>% as.matrix() %>% as.vector()
         
         ## make plots
 
@@ -60,7 +58,7 @@ filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_medi
         
         if(method=="breakpoint"){
           myplot<-myplot+
-            geom_line(aes(x=ord,y=segment_line),size=1,colour="green",alpha=0.8)
+            geom_line(aes(x=ord,y=segment_line),size=1,colour="skyblue",alpha=0.8)
             
         }
         ggsave(paste0("MedianCoverage_",i,"_to_",target,"_method-",method,".pdf"),plot=myplot,width=30,height=20,units="cm")
@@ -68,33 +66,34 @@ filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_medi
     }
     
   if(length(cov)>1){
-    mychosen_intersect<-Reduce(intersect, mychosen)
-    mychosen_outersect<-incov_summary[[i]]$ID[! incov_summary[[i]]$ID %in% mychosen_intersect]
-    my_highcov_intersect<-Reduce(intersect, my_highcov)
-    my_lowcov_intersect<-Reduce(intersect, my_lowcov)
+    chosen_intersect<-Reduce(intersect, chosen)
+    chosen_outersect<-incov_summary[[i]]$ID[! incov_summary[[i]]$ID %in% chosen_intersect]
+    highcov_intersect<-Reduce(intersect, highcov)
+    lowcov_intersect<-Reduce(intersect, lowcov)
   }else{
-    mychosen_intersect<-mychosen[[1]]
-    mychosen_outersect<-incov_summary[[1]]$ID[! incov_summary[[1]]$ID %in% mychosen_intersect]
-    my_highcov_intersect<- my_highcov[[1]]
-    my_lowcov_intersect<- my_lowcov[[1]]
+    chosen_intersect<-chosen[[1]]
+    chosen_outersect<-incov_summary[[1]]$ID[! incov_summary[[1]]$ID %in% chosen_intersect]
+    highcov_intersect<- highcov[[1]]
+    lowcov_intersect<- lowcov[[1]]
   }
-    cat("Filtering kept",length(mychosen_intersect),"out of",length(incov_summary[[i]]$ID),"targets")
-    write.table(data.frame(ID=mychosen_intersect),paste0(out,".kept"),col.names=F,row.names=F,quote=F)
-    write.table(data.frame(ID=mychosen_outersect),paste0(out,".removed"),col.names=F,row.names=F,quote=F)
-    write.table(data.frame(ID=my_highcov_intersect),paste0(out,".highcoverage"),col.names=F,row.names=F,quote=F)
-    write.table(data.frame(ID=my_lowcov_intersect),paste0(out,".lowcoverage"),col.names=F,row.names=F,quote=F)
+    cat("Filtering kept",length(chosen_intersect),"out of",length(incov_summary[[i]]$ID),"targets")
+    write.table(data.frame(ID=chosen_intersect),paste0(out,".kept"),col.names=F,row.names=F,quote=F)
+    write.table(data.frame(ID=chosen_outersect),paste0(out,".removed"),col.names=F,row.names=F,quote=F)
+    write.table(data.frame(ID=highcov_intersect),paste0(out,".highcoverage"),col.names=F,row.names=F,quote=F)
+    write.table(data.frame(ID=lowcov_intersect),paste0(out,".lowcoverage"),col.names=F,row.names=F,quote=F)
     
     mytarget<-readDNAStringSet(target)
-    myout_target<-mytarget[mychosen_intersect]
+    myout_target<-mytarget[chosen_intersect]
     writeXStringSet(myout_target,paste0(out,"_middle_coverage.fasta"))
     
-    myout_target<-mytarget[my_highcov_intersect]
+    myout_target<-mytarget[highcov_intersect]
     writeXStringSet(myout_target,paste0(out,"_high_coverage.fasta"))
     
-    myout_target<-mytarget[my_lowcov_intersect]
+    myout_target<-mytarget[lowcov_intersect]
     writeXStringSet(myout_target,paste0(out,"_low_coverage.fasta"))
 }
 
+suppressMessages(suppressWarnings(require(optparse)))
 
 p <- OptionParser(usage="Vet your targets by identifying loci with low/null, roughly expected, and greater than expected median coverage.\n
                 Requires the following packages: tidyverse, Biostrings, segmented, optparse\n
