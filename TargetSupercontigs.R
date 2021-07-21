@@ -143,6 +143,11 @@ p <- add_option(p, c("--keepLongSupercontigs"), help="<Optional: logical: whethe
 # parse
 args<-parse_args(p)
 
+if(any(is.null(c(args$blast_file,args$genome,args$output_prefix)))) {
+  # Print the help message
+  print_help(p)
+  cat("Hey hey hey! Some required arguments are missing.\n")
+}else{
 ## RUN
 TargetSupercontigs(blast_file=args$blast_file,
                    genome=args$genome,
@@ -153,3 +158,4 @@ TargetSupercontigs(blast_file=args$blast_file,
                    max_length=args$max_length,
                    keepDuplicates=args$keepDuplicates,
                    keepLongSupercontigs=args$keepLongSupercontigs)
+}
