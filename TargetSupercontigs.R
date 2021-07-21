@@ -62,6 +62,7 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
         filter(new_target_length >= min_length) %>%
         arrange(qseqid)
       
+	  # Find and maybe remove duplicates 
       dups<-names(which(table(dat_Ranges$qseqid)>1))
       if(length(dups)>0){
         cat("Warning: after removing blacklisted targets and supercontigs shorter than ",min_length,"bp, ",length(dups)," targets still have multiple hits, suggesting paralogy.
