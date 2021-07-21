@@ -100,7 +100,7 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
           cat("Removed",sum(width(chosen_regions_sequences)>=max_length),"supercontigs >= max_length:",max_length,"\n")
           chosen_regions_sequences<-chosen_regions_sequences[-which(width(chosen_regions_sequences)>=max_length)]
         }else{
-          cat("Ignoring max_length and keeping long supercontigs\n")
+          cat("Note: Ignoring max_length and keeping long supercontigs\n")
         }
         cat("Wrote",length(chosen_regions_sequences),"supercontigs to", paste0(output_prefix,"_TargetSuperContigs.fasta\n"))
         writeXStringSet(chosen_regions_sequences,paste0(output_prefix,"_TargetSuperContigs.fasta"))
@@ -112,9 +112,6 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
   }
 }
 
-### NOTE: doesn't seem to be properly filtering long supercontigs...
-
-
 #### DONE DEFINING FUNCTIONS
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
 
@@ -125,15 +122,15 @@ p <- OptionParser(usage=" This script will take\n
   and do the following:\n
    a. Find the start and end coordinates of the supercontigs according to the blast result.\n
    b. Flag and (by defualt) remove targets with more than one inferred supercontig match. You can change this by setting keepDuplicates to TRUE.\n
-   c. Remove  any longer than min_length
+   c. Remove any shorter than min_length\n
    d. Index the reference genome (if no index is present) and extract the supercontigs\n
    e. If keepLongSupercontigs=FALSE (the default), remove any supercontigs longer than max_length\n
-   f. Write a Fasta with 
+   f. Write a Fasta with your new supercontigs
   Run using Rscript, e.g.\n
   Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --genome my_genome.fa --output_prefix test --blacklist targets.remove.txt\n"
 )
 # Add a positional argument
-p <- add_option(p, c("-b","--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject>",type="character")
+p <- add_option(p, c("-b","--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject. **With Header!**>",type="character")
 p <- add_option(p, c("-g","--genome"), help="<Required: genome used in blast search>",type="character")
 p <- add_option(p, c("-o","--output_prefix"), help="<Required: prefix to name results files>",type="character")
 p <- add_option(p, c("-x","--blacklist"), help="<Optional: file listing targets to exclude>",type="character")
