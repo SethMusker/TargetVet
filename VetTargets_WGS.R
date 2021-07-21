@@ -61,7 +61,7 @@ filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_medi
             geom_line(aes(x=ord,y=segment_line),size=1,colour="skyblue",alpha=0.8)
             
         }
-        ggsave(paste0("MedianCoverage_",i,"_to_",target,"_method-",method,".pdf"),plot=myplot,width=30,height=20,units="cm")
+        ggsave(paste0("MedianCoverage_",out,"_method_",method,".pdf"),plot=myplot,width=30,height=20,units="cm")
 
     }
     
