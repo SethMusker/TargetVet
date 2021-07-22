@@ -131,7 +131,8 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
     
     temp<-data %>% 
       filter(qseqid==i)
-    
+      # don't plot if it won't fit in the plot area
+    if(nrow(temp)<=72){
     introns <-  temp %>% group_by(qseqid,sseqid)%>% 
       mutate(p_sstart=ifelse(sstart<send,sstart,send),
              p_send=ifelse(p_sstart==sstart,send,sstart),
@@ -170,9 +171,11 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
                          label.r=0.01,seed=1234,
                          max.overlaps=15)
     }
-    
-    
     print(p)
+    }else{
+     p<-ggplot()+ggtitle(paste0(i,": Too many matches to fit in plot area!"))
+     print(p)
+   }
   }
   dev.off()
   
