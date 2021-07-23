@@ -185,7 +185,8 @@ CheckTargets<-function(blast_file,
                        min_pident,min_fragment_length,
                        max_intron_length,max_intron_percent,
                        output_prefix,
-                       min_display_intron,max_display_intron){
+                       min_display_intron,max_display_intron,
+                       doPlots){
   dat<-as_tibble(read.table(blast_file,header=T))
   dat<-dat %>%
     filter(pident >= min_pident,
@@ -199,7 +200,10 @@ CheckTargets<-function(blast_file,
   write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE)
   write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE)
   
-  PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
+  if(doPlots){
+    suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
+    PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
+  }
   
 }
 
@@ -226,12 +230,12 @@ p <- add_option(p, c("--max_intron_percent"), help="<Required: percentage of a s
 p <- add_option(p, c("--output_prefix"), help="<prefix to name results files; defaults to CheckTargets_results>",type="character",default = "CheckTargets_results")
 p <- add_option(p, c("--min_display_intron"), help="<intron length above which to annotate on plots; default 1kb>",type="numeric",default=1000)
 p <- add_option(p, c("--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
+p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
 
 # parse
 args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
-suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
 
 ## RUN
 CheckTargets(blast_file=args$blast_file,
@@ -241,7 +245,8 @@ CheckTargets(blast_file=args$blast_file,
              max_intron_percent=args$max_intron_percent,
              output_prefix=args$output_prefix,
              min_display_intron=args$min_display_intron,
-             max_display_intron=args$max_display_intron)
+             max_display_intron=args$max_display_intron,
+             doPlots = args$doPlots)
 
 
 
