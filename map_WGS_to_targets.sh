@@ -3,7 +3,7 @@
 ## this script maps your WGS paired-end reads to your target set and computes the coverage at each location
 ## Dependencies: BWA, samtools 
 
-while getopts F:R:T:n: option
+while getopts F:R:T:n:q: option
 do
 case "${option}"
 in

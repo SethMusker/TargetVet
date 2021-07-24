@@ -34,15 +34,16 @@ GetCoverageStats<-function(data){
         target_seq<-c(target_seq,seq(temp2[f,]$qstart,temp2[f,]$qend))
       }
       mycounts<-table(target_seq)-1 #subtract 1 because we've appended to the original sequence
+      paralogy_index<-mean(mycounts)
       paralog_percent<-length(mycounts[mycounts>1])/unique(temp2$qlen)
-      mean_paralogy_rate<-mean(mycounts)
       full_percent<-length(mycounts[mycounts>0])/unique(temp2$qlen)
+      paralog_percent_ignoreMissing<-paralog_percent*100/full_percent
       unique_percent<-length(mycounts[mycounts==1])/unique(temp2$qlen)
       missing_percent<-length(mycounts[mycounts==0])/unique(temp2$qlen)
       coverage_summary_chromosome_aware<-rbind(coverage_summary_chromosome_aware,
                               data.frame(qseqid=unique(temp2$qseqid),
                                          sseqid=unique(temp2$sseqid),
-                                         mean_paralogy_rate=round(mean_paralogy_rate,1),
+                                         paralogy_index=round(paralogy_index,1),
                                          paralog_percent=paralog_percent,
                                          full_percent=full_percent,
                                          unique_percent=unique_percent,
@@ -57,13 +58,13 @@ GetCoverageStats<-function(data){
     mycounts<-table(target_seq2)-1 #subtract 1 because we've appended to the original sequence
     paralog_percent<-length(mycounts[mycounts>1])/unique(temp$qlen)
     # weighted_paralog_percent<-(length(mycounts[mycounts>1])*mean(mycounts[mycounts>1])/unique(temp$qlen))
-    mean_paralogy_rate<-mean(mycounts)
+    paralogy_index<-mean(mycounts)
     full_percent<-length(mycounts[mycounts>0])/unique(temp$qlen)
     unique_percent<-length(mycounts[mycounts==1])/unique(temp$qlen)
     missing_percent<-length(mycounts[mycounts==0])/unique(temp$qlen)
     coverage_summary_chromosome_UNaware<-rbind(coverage_summary_chromosome_UNaware,
                                              data.frame(qseqid=unique(temp$qseqid),
-                                                        mean_paralogy_rate=round(mean_paralogy_rate,1),
+                                                        paralogy_index=round(paralogy_index,1),
                                                         paralog_percent=paralog_percent,
                                                         full_percent=full_percent,
                                                         unique_percent=unique_percent,

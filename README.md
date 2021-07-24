@@ -1,5 +1,5 @@
-## TL;DR
-TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads or a reference genome to:
+# TL;DR
+TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads, a reference genome, or assembled contigs from target capture sequence data, to:
  1. Identify putative **paralogs** and **missing genes** (both `VetTargets_WGS.R` and `VetTargets_genome.R`).
  2. Nicely visualise the **genomic context** of your targets relative to your study group.
  3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should definitely NOT be assumed to be in linkage equilibrium). (Only `VetTargets_genome.R`).
@@ -24,7 +24,7 @@ BiocManager::install("Biostrings")
 BiocManager::install("Rsamtools")
 ```
 
-## `VetTargets_WGS.R` and `VetTargets_genome.R`
+# **`VetTargets_WGS.R`** and **`VetTargets_genome.R`**
 
 You're doing a phylogenomics using target capture and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many nasty paralogs or other surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
 
@@ -59,7 +59,7 @@ blastn -query yourtargets.fasta -db yourgenome_db -outfmt "6 qseqid sseqid piden
 ```
 Then just paste in the header line above.
 
-## `TargetSupercontigs.R` (forthcoming)
+# **`TargetSupercontigs.R`**
 Extract supercontigs from (draft) genome assemblies for more effective target capture sequencing in **closely related species**.
 
 ### Rationale
@@ -67,11 +67,21 @@ Phylogenomic projects in non-model organisms typically use exons as their target
 
 At the same time, whole-genome shotgun sequencing is now relatively cheap, making draft genome assembly possible for us poor phylogeneticists working on non-model organisms.
 
-`TargetSupercontigs.R` aims to locate target exons in the draft genome and extract the full exon + intron ('supercontig'). These can then be used as targets instead of (or in combination with) the original exons, provided all the species you're working with are relatively closely related (at deep time scales introns will become too divergent to be useful as targets; exactly how deep the time scale limit is is very hard to say, but the probes can apparently tolerate 80% or even just 70% similarity between the probe and true sequences).
+`TargetSupercontigs.R` aims to locate target genes in the draft genome and extract the full exon + intron ('supercontig'). These can then be used as targets instead of (or in combination with) the original targets(if they're from a different species), provided all the species you're working with are relatively closely related. Note that at deep time scales introns will become too divergent to be useful as targets; exactly how deep the time scale limit is is very hard to say, but the probes can apparently tolerate 80% or even just 70% similarity between the probe and true sequences.
 
-## References
+## Usage
+```
+# to get usage and help
+Rscript TargetSupercontigs.R
+# basic run with default parameters and blacklist from VetTargets_WGS.R
+Rscript TargetSupercontigs.R -b blastn_yourtargets_to_yourgenome.withHeader.txt -g yourgenome.fasta -o test1 -x test1.removed 
+```
+
+
+# References
 <a id="1">(1)</a> Gatesy, J. & Springer, M. S. (2014). Phylogenetic analysis at deep timescales: Unreliable gene trees, bypassed hidden support, and the coalescence/concatalescence conundrum, _Molecular Phylogenetics and Evolution_, 80, 231-266.
 
+## Notes to self
 ##### TODO:
 Make script to group exons from the same gene into separate target loci when introns are super big. (?)
 ##### DONE 
