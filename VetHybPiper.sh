@@ -1,5 +1,10 @@
 ## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper
 
+
+## set defaults
+threads=1
+LENGTH=100
+## parse args
 while getopts V:D:T:S:G:N:L: option
 do
 case "${option}"
@@ -20,6 +25,9 @@ done
 mkdir -p ${DIR}/TargetVet_results/assemblies_collated
 while read i;do
     while read g; do
+        if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
+            gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
+        fi
         cat ${DIR}/${i}/${g}/${g}_contigs.fasta
     done < ${GENES} > ${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta
 done < ${SAMPLES}
@@ -49,8 +57,8 @@ while read i;do
     --min_fragment_length ${LENGTH} \
     --min_pident 60 \
     --max_intron_length 10000 \
-    --max_intron_percent 80 \
-    --min_display_intron 50 \
+    --max_intron_percent 1 \
+    --min_display_intron 1 \
     --doPlots FALSE > ${i}.Rout
 done < ${SAMPLES} 
 
