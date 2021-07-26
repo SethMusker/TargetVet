@@ -11,14 +11,12 @@
 ###  --blast_file <tab-delimited blast result, target=query, genome=subject>
 ###  --min_pident < % identity below which to discard blast matches prior to running checks >
 ###  --max_intron_length < maximum allowable length of any given intron in a gene >
-
 ###  --min_fragment_length < minimum length of a blast hit, ignore anything smaller >
 ###  --output_prefix < prefix to name results files >
-
 ## not yet implemented
 ###  --max_intron_percent < maximum allowable percentage of a supercontig's length consisting of introns >
 
-GetCoverageStats<-function(data){
+GetCoverageStats<-function(data,doCovPerChrom=TRUE){
   coverage_summary_chromosome_aware<-data.frame()
   coverage_summary_chromosome_UNaware<-data.frame()
   for(i in unique(data$qseqid)){
@@ -27,7 +25,8 @@ GetCoverageStats<-function(data){
       arrange(qstart) 
    
     # per-target+chromosome combo 
-    for(m in unique(temp$sseqid)){
+    if(doCovPerChrom){
+      for(m in unique(temp$sseqid)){
       temp2<-temp %>% filter(sseqid==m)
       target_seq<-seq(1:unique(temp2$qlen))
       for(f in 1:nrow(temp2)){
@@ -37,7 +36,7 @@ GetCoverageStats<-function(data){
       paralogy_index<-mean(mycounts)
       paralog_percent<-length(mycounts[mycounts>1])/unique(temp2$qlen)
       full_percent<-length(mycounts[mycounts>0])/unique(temp2$qlen)
-      paralog_percent_ignoreMissing<-paralog_percent*100/full_percent
+      paralog_percent_ignoreMissing<-paralog_percent/full_percent
       unique_percent<-length(mycounts[mycounts==1])/unique(temp2$qlen)
       missing_percent<-length(mycounts[mycounts==0])/unique(temp2$qlen)
       coverage_summary_chromosome_aware<-rbind(coverage_summary_chromosome_aware,
@@ -49,7 +48,9 @@ GetCoverageStats<-function(data){
                                          full_percent=full_percent,
                                          unique_percent=unique_percent,
                                          missing_percent=missing_percent))
-    }
+      }
+   }
+    
     
     # per-target only (ignoring which chromosome(s) it matches to)
     target_seq2<-seq(1:unique(temp$qlen))
@@ -63,25 +64,31 @@ GetCoverageStats<-function(data){
     full_percent<-length(mycounts[mycounts>0])/unique(temp$qlen)
     unique_percent<-length(mycounts[mycounts==1])/unique(temp$qlen)
     missing_percent<-length(mycounts[mycounts==0])/unique(temp$qlen)
+    paralog_percent_ignoreMissing<-paralog_percent/full_percent
     coverage_summary_chromosome_UNaware<-rbind(coverage_summary_chromosome_UNaware,
                                              data.frame(qseqid=unique(temp$qseqid),
                                                         paralogy_index=round(paralogy_index,1),
                                                         paralog_percent=paralog_percent,
+                                                        paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
                                                         full_percent=full_percent,
                                                         unique_percent=unique_percent,
                                                         missing_percent=missing_percent))
   }
   # round and convert to percentage
+if(doCovPerChrom) {
   coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:3],apply(coverage_summary_chromosome_aware[,4:ncol(coverage_summary_chromosome_aware)],2,function(x) round(x,3)*100)))
   coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
-  
   coverage_summary_nchroms<-coverage_summary_chromosome_aware %>%
     group_by(qseqid) %>%
     summarise(n_chroms=n(),
               .groups = "keep")
   coverage_summary_chromosome_UNaware<-left_join(coverage_summary_chromosome_UNaware,coverage_summary_nchroms,"qseqid")
-  
   return(list(coverage_summary_chromosome_aware=coverage_summary_chromosome_aware,coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
+}else{
+  ## Note when doCovPerChrom=FALSE you don't get the n_chroms field
+  coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
+  return(list(coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
+}
 }
 
 FindIntrons<-function(data,max_intron_length,max_intron_percent){
@@ -192,14 +199,15 @@ CheckTargets<-function(blast_file,
                        min_display_intron,
                        max_display_intron,
                        doPlots,
-                       doIntronStats){
+                       doIntronStats,
+                       doCovPerChrom){
   dat<-as_tibble(read.table(blast_file,header=T))
   dat<-dat %>%
     filter(pident >= min_pident,
            length >= min_fragment_length)
   
-  cov_stats<-GetCoverageStats(dat)
-  write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE)
+  cov_stats<-GetCoverageStats(dat,doCovPerChrom)
+  if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE) }
   write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE)
   
   if(doIntronStats){
@@ -240,6 +248,7 @@ p <- add_option(p, c("--min_display_intron"), help="<intron length above which t
 p <- add_option(p, c("--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
 p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
 
 # parse
 args<-parse_args(p)
@@ -256,7 +265,8 @@ CheckTargets(blast_file=args$blast_file,
              min_display_intron=args$min_display_intron,
              max_display_intron=args$max_display_intron,
              doPlots = args$doPlots,
-             doIntronStats=args$doIntronStats)
+             doIntronStats=args$doIntronStats,
+             doCovPerChrom=args$doCovPerChrom)
 
 
 

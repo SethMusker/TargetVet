@@ -12,8 +12,9 @@
 ## set defaults
 LENGTH=100
 DO_INTRON=TRUE
+DO_PER_CHROM=TRUE
 ## parse args
-while getopts V:D:T:S:G:L:I: option
+while getopts V:D:T:S:G:L:I:C: option
 do
 case "${option}"
 in
@@ -25,6 +26,7 @@ S) SAMPLES=${OPTARG};;
 G) GENES=${OPTARG};;
 L) LENGTH=${OPTARG};;
 I) DO_INTRON=${OPTARG};;
+C) DO_PER_CHROM=${OPTARG};;
 
 esac
 done
@@ -81,8 +83,9 @@ while read i;do
     --max_intron_length 10000 \
     --max_intron_percent 1 \
     --min_display_intron 1 \
-    --doPlots FALSE\
-    --doIntronStats ${DO_INTRON} > ${i}.Rout
+    --doPlots FALSE \
+    --doIntronStats ${DO_INTRON} \
+    --doCovPerChrom ${DO_PER_CHROM}
  fi
 done < ${DIR}/${SAMPLES}
 
@@ -92,4 +95,6 @@ done < ${DIR}/${SAMPLES}
 # AND
 # 6. Output genelists for paralogs and single-copy
 
-Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${DIR}/TargetVet_results/VetTargets_genome_output > ${DIR}/TargetVet_results/VetTargets_genome_output/DetectParalogs.Rout
+echo "Detecting paralogs..."
+Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${DIR}/TargetVet_results/VetTargets_genome_output
+echo "All done."
