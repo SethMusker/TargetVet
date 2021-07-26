@@ -45,6 +45,7 @@ GetCoverageStats<-function(data){
                                          sseqid=unique(temp2$sseqid),
                                          paralogy_index=round(paralogy_index,1),
                                          paralog_percent=paralog_percent,
+                                         paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
                                          full_percent=full_percent,
                                          unique_percent=unique_percent,
                                          missing_percent=missing_percent))

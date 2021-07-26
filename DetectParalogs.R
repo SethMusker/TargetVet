@@ -13,7 +13,8 @@ collate<-function(samples,directory){
     out$Sample<-as.factor(out$Sample)
     out$qseqid<-as.factor(out$qseqid)
     
-    out_meanSort<-out %>% mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) %>%
+    out_meanSort<-out %>%
+        mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) %>%
         arrange(paralog_percent_ignoreMissing)
     
     #get the order and do segmented
@@ -23,6 +24,8 @@ collate<-function(samples,directory){
     lm.mean<-lm(paralog_percent_ignoreMissing~orderMean+0,data=out_meanSort) # force intercept=0
     seg.mean<-segmented(lm.mean,npsi=1)
     out_meanSort$seg.pred<-predict(seg.mean,data.frame(orderMean=out_meanSort$orderMean))
+    out_meanSort$resid<-out_meanSort$paralog_percent_ignoreMissing-out_meanSort$seg.pred
+    out_meanSort$resid_sq<-out_meanSort$resid^2
     
     #####################
     ### BEGIN PLOTTING ##
