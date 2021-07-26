@@ -6,12 +6,14 @@
 #  -S file listing sample names to process: must be in directory specified in -D
 #  -G file listing gene names to process: must be in directory specified in -D
 #  -L minimum length of blast matches to keep for analysis
+#  -I do IntronStats? default = TRUE
 
 
 ## set defaults
 LENGTH=100
+DO_INTRON=TRUE
 ## parse args
-while getopts V:D:T:S:G:L: option
+while getopts V:D:T:S:G:L:I: option
 do
 case "${option}"
 in
@@ -22,6 +24,7 @@ T) TARGETS=${OPTARG};;
 S) SAMPLES=${OPTARG};;
 G) GENES=${OPTARG};;
 L) LENGTH=${OPTARG};;
+I) DO_INTRON=${OPTARG};;
 
 esac
 done
@@ -78,7 +81,8 @@ while read i;do
     --max_intron_length 10000 \
     --max_intron_percent 1 \
     --min_display_intron 1 \
-    --doPlots FALSE > ${i}.Rout
+    --doPlots FALSE\
+    --doIntronStats ${DO_INTRON} > ${i}.Rout
  fi
 done < ${DIR}/${SAMPLES}
 

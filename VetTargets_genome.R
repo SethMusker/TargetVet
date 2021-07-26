@@ -184,11 +184,15 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
 }
 
 CheckTargets<-function(blast_file,
-                       min_pident,min_fragment_length,
-                       max_intron_length,max_intron_percent,
+                       min_pident,
+                       min_fragment_length,
+                       max_intron_length,
+                       max_intron_percent,
                        output_prefix,
-                       min_display_intron,max_display_intron,
-                       doPlots){
+                       min_display_intron,
+                       max_display_intron,
+                       doPlots,
+                       doIntronStats){
   dat<-as_tibble(read.table(blast_file,header=T))
   dat<-dat %>%
     filter(pident >= min_pident,
@@ -198,10 +202,12 @@ CheckTargets<-function(blast_file,
   write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE)
   write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE)
   
-  intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
-  write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE)
-  write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE)
-  
+  if(doIntronStats){
+    intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
+    write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE)
+    write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE)
+  }
+
   if(doPlots){
     suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
     PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
@@ -233,6 +239,7 @@ p <- add_option(p, c("--output_prefix"), help="<prefix to name results files; de
 p <- add_option(p, c("--min_display_intron"), help="<intron length above which to annotate on plots; default 1kb>",type="numeric",default=1000)
 p <- add_option(p, c("--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
 p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
 
 # parse
 args<-parse_args(p)
@@ -248,7 +255,8 @@ CheckTargets(blast_file=args$blast_file,
              output_prefix=args$output_prefix,
              min_display_intron=args$min_display_intron,
              max_display_intron=args$max_display_intron,
-             doPlots = args$doPlots)
+             doPlots = args$doPlots,
+             doIntronStats=args$doIntronStats)
 
 
 
