@@ -22,7 +22,7 @@ collate<-function(samples,directory){
     out_meanSort$orderMean<-sapply(out_meanSort$qseqid,function(x) {
         y<-which(levels(out_meanSort$qseqid)==x)
         return(y)})
-    lm.mean<-lm(paralog_percent_ignoreMissing~orderMean+0,data=out_meanSort) # force intercept=0
+    lm.mean<-lm(paralog_percent_ignoreMissing~orderMean,data=out_meanSort) # DON'T force intercept=0
     seg.mean<-segmented(lm.mean,npsi=1)
     out_meanSort$seg.pred<-predict(seg.mean,newdata=data.frame(orderMean=out_meanSort$orderMean))
     out_meanSort$resid<-out_meanSort$paralog_percent_ignoreMissing - out_meanSort$seg.pred
@@ -129,11 +129,11 @@ collate<-function(samples,directory){
 
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
 
-p <- OptionParser(usage=" This script will tale the CoverageStats output of VetTargets_genome.R for \n
+p <- OptionParser(usage=" This script will take the CoverageStats output of VetTargets_genome.R for \n
                         many samples and detect paralogs in a targeted set of genes ")
 # Add a positional argument
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
-p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets>",type="character")
+p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
 # parse
 args<-parse_args(p)
 
