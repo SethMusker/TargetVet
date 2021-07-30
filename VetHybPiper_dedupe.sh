@@ -16,7 +16,7 @@ DO_PER_CHROM=TRUE
 DEDUPE=FALSE
 MINIDENTITY=97
 ## parse args
-while getopts V:D:T:S:G:L:I:C:d:m: option
+while getopts V:D:T:S:G:L:I:C:d:m:O: option
 do
 case "${option}"
 in
