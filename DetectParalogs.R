@@ -1,5 +1,17 @@
 
-collate<-function(samples,directory){
+collate<-function(samples,directory,outdir,force){
+    
+    if(dir.exists(outdir)){
+        if(!force){
+            stop("Specified output directory exists.\nTerminating. Use -f TRUE to overwrite.\n")
+        }else{
+            cat("Specified output directory exists.\n")
+            cat("Will overwrite. \n(If it fails it's because the output file is open on your computer somewhere. Close and rerun.)\n")
+        }
+    }else{
+        cat("Specified output directory exists not. Will attempt to create it.\n")
+        dir.create(outdir)
+    }
     
     samples<-scan(samples,what="character")
     
@@ -31,17 +43,37 @@ collate<-function(samples,directory){
     #####################
     ### BEGIN PLOTTING ##
     #####################
+        
+    ##plot breakpoint analysis
     out_meanSort %>%
         ggplot(aes(x=qseqid,y=paralog_percent_ignoreMissing))+
         theme_bw()+
         geom_point(aes(colour=missing_percent),alpha=0.5)+
-        scale_colour_gradientn("Missingness (%)",colours=c("blue","grey","red"))+
+        scale_colour_viridis_c("Missingness (%)",option="D",end=0.8)+
         theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5))+
         geom_line(aes(x=orderMean,y=seg.pred))+
         geom_vline(xintercept = seg.mean$psi[2],lty=2)+
         labs(y="Paralog Rate (%)",x="Target")
     ggsave(paste0(directory,"/paralog_percent_ignoreMissing_meanSort_breakpoint.pdf"),width=40,height=20,units = "cm")
-
+    
+    ## HEATMAPS
+    # paralogy
+    ggplot(out_meanSort)+
+        geom_raster(aes(x=qseqid,y=Sample,fill=paralog_percent_ignoreMissing))+
+        scale_fill_viridis_c("Paralogy (%)",option="D",end=0.8)+
+        labs(x="Target")+
+        theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    ggsave(paste0(outdir,"/","paralogy_heatmap.pdf"),width=28,height=20,units="cm")
+    
+    #missingness
+    out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
+        ggplot()+
+        geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
+        scale_fill_viridis_c("Missingness (%)",option="D",end=0.8)+
+        labs(x="Target")+
+        theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    ggsave(paste0(outdir,"/","missingness_heatmap.pdf"),width=28,height=20,units="cm")
+    
 ## Per-sample plots
    #plot missingness
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
@@ -51,7 +83,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Missingness(%)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("All target loci")
-    ggsave(paste0(directory,"/missing_percent_perSample.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/missing_percent_perSample.pdf"),width=30,units = "cm")
 
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -61,7 +93,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Missingness(%)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(directory,"/missing_percent_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/missing_percent_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
 
     # Plot paralogy
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
@@ -71,7 +103,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Observed Paralog Rate (ignoring missing segments)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("All target loci")
-    ggsave(paste0(directory,"/paralog_percent_ignoreMissing_perSample.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample.pdf"),width=30,units = "cm")
 
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -81,7 +113,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Observed Paralog Rate (ignoring missing segments)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(directory,"/paralog_percent_ignoreMissing_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
 
     # Plot residuals
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
@@ -91,7 +123,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Obs - Exp Paralog Rate for breakpoint regression with 1 inflection point")+
         ggtitle("All target loci")
-    ggsave(paste0(directory,"/paralog_percent_ignoreMissing_meanSort_breakpoint_RESIDUALS_boxplot.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_meanSort_breakpoint_RESIDUALS_boxplot.pdf"),width=30,units = "cm")
     
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -101,7 +133,7 @@ collate<-function(samples,directory){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Obs - Exp Paralog Rate for breakpoint regression with 1 inflection point")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(directory,"/paralog_percent_ignoreMissing_meanSort_breakpoint_RESIDUALS_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_meanSort_breakpoint_RESIDUALS_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
     #####################
     ### DONE PLOTTING ###
     #####################
@@ -113,18 +145,18 @@ collate<-function(samples,directory){
                     diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
                     .groups="keep")
     
-    write.table(out_meanSort_summary,paste0(directory,"/paralogy_summary.txt"),
-                quote=F,row.names=F)
+    write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary.txt"),
+                quote=F,row.names=F,sep="\t")
     out_meanSort %>% group_by(qseqid) %>% arrange(paralog_percent_ignoreMissing,.by_group=TRUE) %>%
-    write.table(paste0(directory,"/paralogy_details.txt"),
-                quote=F,row.names=F)
+    write.table(paste0(outdir,"/paralogy_details.txt"),
+                quote=F,row.names=F,sep="\t")
     
     out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
         write.table(paste0(directory,"/paralog_list.txt"),
-                    quote=F,row.names=F,col.names=F)
+                    quote=F,row.names=F,col.names=F,sep="\t")
     out_meanSort_summary %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
         write.table(paste0(directory,"/singleCopy_list.txt"),
-                    quote=F,row.names=F,col.names=F)
+                    quote=F,row.names=F,col.names=F,sep="\t")
 }
 
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
@@ -134,14 +166,18 @@ p <- OptionParser(usage=" This script will take the CoverageStats output of VetT
 # Add a positional argument
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
 p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
+p <- add_option(p, c("-o","--outdir"), help="<Directory in which to write results. Defaults to current directory>",type="character",default=".")
+p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 # parse
 args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
 
-collate(samples=args$samples,
-        directory=args$directory)
+collate(samples = args$samples,
+        directory = args$directory,
+        outdir = args$outdir,
+        force = args$force)
 
 
 
