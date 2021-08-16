@@ -49,7 +49,7 @@ collate<-function(samples,directory,outdir,force){
         ggplot(aes(x=qseqid,y=paralog_percent_ignoreMissing))+
         theme_bw()+
         geom_point(aes(colour=missing_percent),alpha=0.5)+
-        scale_colour_viridis_c("Missingness (%)",option="D",end=0.8)+
+        scale_colour_viridis_c("Missingness (%)",option="D")+
         theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5))+
         geom_line(aes(x=orderMean,y=seg.pred))+
         geom_vline(xintercept = seg.mean$psi[2],lty=2)+
@@ -60,19 +60,50 @@ collate<-function(samples,directory,outdir,force){
     # paralogy
     ggplot(out_meanSort)+
         geom_raster(aes(x=qseqid,y=Sample,fill=paralog_percent_ignoreMissing))+
-        scale_fill_viridis_c("Paralogy (%)",option="D",end=0.8)+
+        scale_fill_viridis_c("Paralogy (%)",option="D")+
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/","paralogy_heatmap.pdf"),width=28,height=20,units="cm")
+    # clustered heatmap (using heatmaply)
+    out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
+        pivot_wider(names_from = qseqid ,values_from = paralog_percent_ignoreMissing, values_fill = NA)
+    out_mat_mat<-as.data.frame(out_mat_samp)
+    rm(out_mat_samp)
+    rownames(out_mat_mat)<-out_mat_mat$Sample
+    out_mat_mat<-out_mat_mat[,-1]
+    ggh<-ggheatmap(as.matrix(out_mat_mat),
+                   k_row = 2, k_col = 2, 
+                   seriate = "mean", 
+                   fontsize_row = 6, fontsize_col = 5, 
+                   column_text_angle = 90,  
+                   na.value = "white",
+                   key.title="Paralogy (%)")
+    ggsave(paste0(outdir,"/","paralogy_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
     
     #missingness
     out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
         ggplot()+
         geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
-        scale_fill_viridis_c("Missingness (%)",option="D",end=0.8)+
+        scale_fill_viridis_c("Missingness (%)",option="D")+
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/","missingness_heatmap.pdf"),width=28,height=20,units="cm")
+    # clustered heatmap (using heatmaply)
+    out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
+        pivot_wider(names_from = qseqid ,values_from = missing_percent, values_fill = NA)
+    out_mat_mat<-as.data.frame(out_mat_samp)
+    rm(out_mat_samp)
+    rownames(out_mat_mat)<-out_mat_mat$Sample
+    out_mat_mat<-out_mat_mat[,-1]
+    ggh<-ggheatmap(as.matrix(out_mat_mat),
+                   k_row = 2, k_col = 2, 
+                   seriate = "mean", 
+                   fontsize_row = 6, fontsize_col = 5, 
+                   column_text_angle = 90,  
+                   na.value = "white",
+                   key.title="Missingness (%)")
+    ggsave(paste0(outdir,"/","missingness_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
+    
     
 ## Per-sample plots
    #plot missingness
@@ -173,6 +204,7 @@ args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(heatmaply,quietly=TRUE,warn.conflicts=FALSE)))
 
 collate(samples = args$samples,
         directory = args$directory,
