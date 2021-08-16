@@ -1,4 +1,5 @@
-## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper
+## Bash script to use TargetVet to detect paralogs from data for many samples that have been 
+## assembled by HybPiper
 ## ARGUMENTS
 #  -V **absolute** directory of VetTargets code: without trailing "/"
 #  -D **absolute** directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/"
