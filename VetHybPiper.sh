@@ -4,8 +4,10 @@
 #  -V **absolute** directory of VetTargets code: without trailing "/"
 #  -D **absolute** directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/"
 #  -T targets fasta (nucleotide): must be in directory specified in -D
-#  -S file listing sample names to process: must be in directory specified in -D
+#  -O output directory. defaults to VetTargets_genome_output
 #  -G file listing gene names to process: must be in directory specified in -D
+#  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene.
+#  -S file listing sample names to process: must be in directory specified in -D
 #  -L minimum length of blast matches to keep for analysis
 #  -I do IntronStats? default = TRUE
 
@@ -14,23 +16,33 @@
 LENGTH=100
 DO_INTRON=TRUE
 DO_PER_CHROM=TRUE
+MULTI=0
+OUTDIR=VetTargets_genome_output
 ## parse args
-while getopts V:D:T:S:G:L:I:C: option
+while getopts V:D:T:S:G:L:I:C:M:O: option
 do
 case "${option}"
 in
 
 V) VETDIR=${OPTARG};;
 D) DIR=${OPTARG};;
+O) OUTDIR=${OPTARG};;
 T) TARGETS=${OPTARG};;
 S) SAMPLES=${OPTARG};;
 G) GENES=${OPTARG};;
+M) MULTI=${OPTARG};;
 L) LENGTH=${OPTARG};;
 I) DO_INTRON=${OPTARG};;
 C) DO_PER_CHROM=${OPTARG};;
 
 esac
 done
+
+# if [[ ${MULTI} == "TRUE" ]]; then
+#    cut -d'-' -f2 ${DIR}/${GENES} > ${DIR}/${GENES}.genenames
+# else
+#    cp ${DIR}/${GENES} ${DIR}/${GENES}.genenames
+# fi
 
 # 1. make TargetVet results folder and collate spades scaffolds per sample
 mkdir -p ${DIR}/TargetVet_results/assemblies_collated
@@ -44,7 +56,7 @@ while read i;do
             gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
         fi
         cat ${DIR}/${i}/${g}/${g}_contigs.fasta
-    done < ${DIR}/${GENES} > ${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta
+    done < ${DIR}/${GENES}.genenames > ${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta
  fi
 done < ${DIR}/${SAMPLES}
 
@@ -64,8 +76,8 @@ while read i;do
 done < ${DIR}/${SAMPLES}
 
 # 3. run VetTargets_genome.R with --doPlots FALSE
-mkdir -p ${DIR}/TargetVet_results/VetTargets_genome_output
-cd ${DIR}/TargetVet_results/VetTargets_genome_output
+mkdir -p ${DIR}/TargetVet_results/${OUTDIR}
+cd ${DIR}/TargetVet_results/${OUTDIR}
 while read i;do
  FILE=${i}_CoverageStats_AcrossChromosomes.txt
  if [[ -f "$FILE" ]]; then
@@ -97,5 +109,5 @@ done < ${DIR}/${SAMPLES}
 # 6. Output genelists for paralogs and single-copy
 
 echo "Detecting paralogs..."
-Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${DIR}/TargetVet_results/VetTargets_genome_output
+Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${DIR}/TargetVet_results/${OUTDIR}
 echo "All done."

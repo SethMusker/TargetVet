@@ -23,33 +23,33 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
     temp<-data %>% 
       filter(qseqid==i)%>%
       arrange(qstart) 
-   
+    
     # per-target+chromosome combo 
     if(doCovPerChrom){
       for(m in unique(temp$sseqid)){
-      temp2<-temp %>% filter(sseqid==m)
-      target_seq<-seq(1:unique(temp2$qlen))
-      for(f in 1:nrow(temp2)){
-        target_seq<-c(target_seq,seq(temp2[f,]$qstart,temp2[f,]$qend))
+        temp2<-temp %>% filter(sseqid==m)
+        target_seq<-seq(1:unique(temp2$qlen))
+        for(f in 1:nrow(temp2)){
+          target_seq<-c(target_seq,seq(temp2[f,]$qstart,temp2[f,]$qend))
+        }
+        mycounts<-table(target_seq)-1 #subtract 1 because we've appended to the original sequence
+        paralogy_index<-mean(mycounts)
+        paralog_percent<-length(mycounts[mycounts>1])/unique(temp2$qlen)
+        full_percent<-length(mycounts[mycounts>0])/unique(temp2$qlen)
+        paralog_percent_ignoreMissing<-paralog_percent/full_percent
+        unique_percent<-length(mycounts[mycounts==1])/unique(temp2$qlen)
+        missing_percent<-length(mycounts[mycounts==0])/unique(temp2$qlen)
+        coverage_summary_chromosome_aware<-rbind(coverage_summary_chromosome_aware,
+                                                 data.frame(qseqid=unique(temp2$qseqid),
+                                                            sseqid=unique(temp2$sseqid),
+                                                            paralogy_index=round(paralogy_index,2),
+                                                            paralog_percent=paralog_percent,
+                                                            paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
+                                                            full_percent=full_percent,
+                                                            unique_percent=unique_percent,
+                                                            missing_percent=missing_percent))
       }
-      mycounts<-table(target_seq)-1 #subtract 1 because we've appended to the original sequence
-      paralogy_index<-mean(mycounts)
-      paralog_percent<-length(mycounts[mycounts>1])/unique(temp2$qlen)
-      full_percent<-length(mycounts[mycounts>0])/unique(temp2$qlen)
-      paralog_percent_ignoreMissing<-paralog_percent/full_percent
-      unique_percent<-length(mycounts[mycounts==1])/unique(temp2$qlen)
-      missing_percent<-length(mycounts[mycounts==0])/unique(temp2$qlen)
-      coverage_summary_chromosome_aware<-rbind(coverage_summary_chromosome_aware,
-                              data.frame(qseqid=unique(temp2$qseqid),
-                                         sseqid=unique(temp2$sseqid),
-                                         paralogy_index=round(paralogy_index,1),
-                                         paralog_percent=paralog_percent,
-                                         paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
-                                         full_percent=full_percent,
-                                         unique_percent=unique_percent,
-                                         missing_percent=missing_percent))
-      }
-   }
+    }
     
     
     # per-target only (ignoring which chromosome(s) it matches to)
@@ -66,29 +66,29 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
     missing_percent<-length(mycounts[mycounts==0])/unique(temp$qlen)
     paralog_percent_ignoreMissing<-paralog_percent/full_percent
     coverage_summary_chromosome_UNaware<-rbind(coverage_summary_chromosome_UNaware,
-                                             data.frame(qseqid=unique(temp$qseqid),
-                                                        paralogy_index=round(paralogy_index,1),
-                                                        paralog_percent=paralog_percent,
-                                                        paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
-                                                        full_percent=full_percent,
-                                                        unique_percent=unique_percent,
-                                                        missing_percent=missing_percent))
+                                               data.frame(qseqid=unique(temp$qseqid),
+                                                          paralogy_index=round(paralogy_index,2),
+                                                          paralog_percent=paralog_percent,
+                                                          paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
+                                                          full_percent=full_percent,
+                                                          unique_percent=unique_percent,
+                                                          missing_percent=missing_percent))
   }
   # round and convert to percentage
-if(doCovPerChrom) {
-  coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:3],apply(coverage_summary_chromosome_aware[,4:ncol(coverage_summary_chromosome_aware)],2,function(x) round(x,3)*100)))
-  coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
-  coverage_summary_nchroms<-coverage_summary_chromosome_aware %>%
-    group_by(qseqid) %>%
-    summarise(n_chroms=n(),
-              .groups = "keep")
-  coverage_summary_chromosome_UNaware<-left_join(coverage_summary_chromosome_UNaware,coverage_summary_nchroms,"qseqid")
-  return(list(coverage_summary_chromosome_aware=coverage_summary_chromosome_aware,coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
-}else{
-  ## Note when doCovPerChrom=FALSE you don't get the n_chroms field
-  coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
-  return(list(coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
-}
+  if(doCovPerChrom) {
+    coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:3],apply(coverage_summary_chromosome_aware[,4:ncol(coverage_summary_chromosome_aware)],2,function(x) round(x,3)*100)))
+    coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
+    coverage_summary_nchroms<-coverage_summary_chromosome_aware %>%
+      group_by(qseqid) %>%
+      summarise(n_chroms=n(),
+                .groups = "keep")
+    coverage_summary_chromosome_UNaware<-left_join(coverage_summary_chromosome_UNaware,coverage_summary_nchroms,"qseqid")
+    return(list(coverage_summary_chromosome_aware=coverage_summary_chromosome_aware,coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
+  }else{
+    ## Note when doCovPerChrom=FALSE you don't get the n_chroms field
+    coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
+    return(list(coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
+  }
 }
 
 FindIntrons<-function(data,max_intron_length,max_intron_percent){
@@ -140,51 +140,51 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
     
     temp<-data %>% 
       filter(qseqid==i)
-      # don't plot if it won't fit in the plot area
+    # don't plot if it won't fit in the plot area
     if(nrow(temp)<=72){
-    introns <-  temp %>% group_by(qseqid,sseqid)%>% 
-      mutate(p_sstart=ifelse(sstart<send,sstart,send),
-             p_send=ifelse(p_sstart==sstart,send,sstart),
-             orientation=ifelse(p_sstart==sstart,"forward","reverse"))%>% 
-      arrange(p_sstart,.by_group = TRUE) %>%
-      summarise(shift_sstart=c(p_sstart,NA),shift_send=c(NA,p_send),
-                intron=(shift_sstart-shift_send),
-                qpos=c(NA,qend),shift_qstart=c(qstart,NA),
-                orientation=c(orientation,NA),
-                .groups = "keep")%>%
-      filter(intron>min_display_intron,intron<max_display_intron)%>%
-      na.exclude()
-    
-    p<-ggplot(temp)+
-      geom_segment(aes(y=sstart,yend=send,x=qstart,xend=qend,colour=bitscore),
-                   show.legend = T,size=2.5)+
-      scale_colour_viridis_c("Sequence\nsimilarity")+
-      facet_wrap(~sseqid,scales = "free")+
-      xlim(c(0,unique(temp$qlen)))+
-      theme_bw()+
-      labs(x="Target position",y="Genome position")+
-      ggtitle(i)+
-      coord_flip()
-    if(nrow(introns)>0){
-      p<-p+geom_rect(data=introns,
-                     aes(xmin=-Inf,xmax=Inf,ymin=shift_sstart,ymax=shift_send),
-                     colour="darkgreen",alpha=0.05,size=NA)+
-        geom_label_repel(data=introns,
-                         aes(x=qpos,
-                             y=shift_sstart-(intron/2),
-                             label=intron),fill="white",
-                         force_pull = 0.1,
-                         size=2,
-                         min.segment.length=unit(5,"mm"),
-                         box.padding = 0.05,label.padding=0.07,
-                         label.r=0.01,seed=1234,
-                         max.overlaps=15)
-    }
-    print(p)
+      introns <-  temp %>% group_by(qseqid,sseqid)%>% 
+        mutate(p_sstart=ifelse(sstart<send,sstart,send),
+               p_send=ifelse(p_sstart==sstart,send,sstart),
+               orientation=ifelse(p_sstart==sstart,"forward","reverse"))%>% 
+        arrange(p_sstart,.by_group = TRUE) %>%
+        summarise(shift_sstart=c(p_sstart,NA),shift_send=c(NA,p_send),
+                  intron=(shift_sstart-shift_send),
+                  qpos=c(NA,qend),shift_qstart=c(qstart,NA),
+                  orientation=c(orientation,NA),
+                  .groups = "keep")%>%
+        filter(intron>min_display_intron,intron<max_display_intron)%>%
+        na.exclude()
+      
+      p<-ggplot(temp)+
+        geom_segment(aes(y=sstart,yend=send,x=qstart,xend=qend,colour=bitscore),
+                     show.legend = T,size=2.5)+
+        scale_colour_viridis_c("Sequence\nsimilarity")+
+        facet_wrap(~sseqid,scales = "free")+
+        xlim(c(0,unique(temp$qlen)))+
+        theme_bw()+
+        labs(x="Target position",y="Genome position")+
+        ggtitle(i)+
+        coord_flip()
+      if(nrow(introns)>0){
+        p<-p+geom_rect(data=introns,
+                       aes(xmin=-Inf,xmax=Inf,ymin=shift_sstart,ymax=shift_send),
+                       colour="darkgreen",alpha=0.05,size=NA)+
+          geom_label_repel(data=introns,
+                           aes(x=qpos,
+                               y=shift_sstart-(intron/2),
+                               label=intron),fill="white",
+                           force_pull = 0.1,
+                           size=2,
+                           min.segment.length=unit(5,"mm"),
+                           box.padding = 0.05,label.padding=0.07,
+                           label.r=0.01,seed=1234,
+                           max.overlaps=15)
+      }
+      print(p)
     }else{
-     p<-ggplot()+ggtitle(paste0(i,": Too many matches to fit in plot area!"))
-     print(p)
-   }
+      p<-ggplot()+ggtitle(paste0(i,": Too many matches to fit in plot area!"))
+      print(p)
+    }
   }
   dev.off()
   
@@ -200,27 +200,61 @@ CheckTargets<-function(blast_file,
                        max_display_intron,
                        doPlots,
                        doIntronStats,
-                       doCovPerChrom){
+                       doCovPerChrom,
+                       multicopyTarget){
   dat<-as_tibble(read.table(blast_file,header=T))
   dat<-dat %>%
     filter(pident >= min_pident,
            length >= min_fragment_length)
-  
-  cov_stats<-GetCoverageStats(dat,doCovPerChrom)
-  if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE) }
-  write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE)
-  
-  if(doIntronStats){
-    intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
-    write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE)
-    write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE)
+  ## for cases where we have multiple copies of each gene in the target file, split the blast results by copy source
+  if(multicopyTarget){
+    dat <- dat %>% separate(col = qseqid, into = c("Source","qseqid"), sep = "-")
+    sp <- dat$Source
+    dat.list <- split(dat, sp)
+    output_prefix_OG <- output_prefix
+    for (i in names(dat.list)){
+      dat <- dat.list[[i]]
+      ## put results for each copy in separate directory
+      if(!dir.exists(i)) dir.create(i)
+      output_prefix <- paste0(i,"/",output_prefix_OG)
+      if(file.exists(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"))){
+        cat(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),"exists. Skipping.")
+      }else{
+        cov_stats<-GetCoverageStats(dat,doCovPerChrom)
+        if(doCovPerChrom){ 
+          write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" ) 
+        }
+        write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+        
+        if(doIntronStats){
+          intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
+          write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+          write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+        }
+        
+        if(doPlots){
+          suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
+          PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
+        }
+      }
+    }
+    
+  } else {
+    cov_stats<-GetCoverageStats(dat,doCovPerChrom)
+    if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" ) }
+    write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+    
+    if(doIntronStats){
+      intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
+      write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+      write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+    }
+    
+    if(doPlots){
+      suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
+      PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
+    }
   }
-
-  if(doPlots){
-    suppressMessages(suppressWarnings(require(ggrepel,quietly=TRUE,warn.conflicts=FALSE)))
-    PlotTargets(dat,output_prefix,min_display_intron,max_display_intron)
-  }
-  
 }
 
 #### DONE DEFINING FUNCTIONS
@@ -243,12 +277,13 @@ p <- add_option(p, c("--min_fragment_length"), help="<Required: minimum length o
 p <- add_option(p, c("--min_pident"), help="<Required: minimum % identity of a blast hit, ignore anything lower>",type="numeric")
 p <- add_option(p, c("--max_intron_length"), help="<Required: length threshold of the largest intron in a gene; flag any gene exceeding>",type="numeric")
 p <- add_option(p, c("--max_intron_percent"), help="<Required: percentage of a supercontig's length consisting of introns; flag any gene exceeding>",type="numeric")
-p <- add_option(p, c("--output_prefix"), help="<prefix to name results files; defaults to CheckTargets_results>",type="character",default = "CheckTargets_results")
+p <- add_option(p, c("--output_prefix"), help="<prefix to name results files; defaults to VetTargets_genome_results>",type="character",default = "VetTargets_genome_results")
 p <- add_option(p, c("--min_display_intron"), help="<intron length above which to annotate on plots; default 1kb>",type="numeric",default=1000)
 p <- add_option(p, c("--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
 p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=TRUE>",type="logical",default=FALSE)
 
 # parse
 args<-parse_args(p)
@@ -256,17 +291,18 @@ args<-parse_args(p)
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
 
 ## RUN
-CheckTargets(blast_file=args$blast_file,
-             min_pident=args$min_pident,
-             min_fragment_length=args$min_fragment_length,
-             max_intron_length=args$max_intron_length,
-             max_intron_percent=args$max_intron_percent,
-             output_prefix=args$output_prefix,
-             min_display_intron=args$min_display_intron,
-             max_display_intron=args$max_display_intron,
+CheckTargets(blast_file = args$blast_file,
+             min_pident = args$min_pident,
+             min_fragment_length = args$min_fragment_length,
+             max_intron_length = args$max_intron_length,
+             max_intron_percent = args$max_intron_percent,
+             output_prefix = args$output_prefix,
+             min_display_intron = args$min_display_intron,
+             max_display_intron = args$max_display_intron,
              doPlots = args$doPlots,
-             doIntronStats=args$doIntronStats,
-             doCovPerChrom=args$doCovPerChrom)
+             doIntronStats = args$doIntronStats,
+             doCovPerChrom = args$doCovPerChrom,
+             multicopyTarget = args$multicopyTarget)
 
 
 

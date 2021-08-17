@@ -64,22 +64,52 @@ collate<-function(samples,directory,outdir,force){
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/","paralogy_heatmap.pdf"),width=28,height=20,units="cm")
-    # clustered heatmap (using heatmaply)
+    # # clustered heatmap (using heatmaply)
+    # out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
+    #     pivot_wider(names_from = qseqid ,values_from = paralog_percent_ignoreMissing, values_fill = NA)
+    # out_mat_mat<-as.data.frame(out_mat_samp)
+    # rm(out_mat_samp)
+    # rownames(out_mat_mat)<-out_mat_mat$Sample
+    # out_mat_mat<-out_mat_mat[,-1]
+    # ggh<-ggheatmap(as.matrix(out_mat_mat),
+    #                k_row = 2, k_col = 2, 
+    #                seriate = "mean", 
+    #                fontsize_row = 6, fontsize_col = 5, 
+    #                column_text_angle = 90,  
+    #                na.value = "white",
+    #                key.title="Paralogy (%)")
+    # ggsave(paste0(outdir,"/","paralogy_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
+    # 
+    
+    out_mat_samp_misscode<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
+        pivot_wider(names_from = qseqid ,values_from = paralog_percent_ignoreMissing, values_fill = -100)
     out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
         pivot_wider(names_from = qseqid ,values_from = paralog_percent_ignoreMissing, values_fill = NA)
-    out_mat_mat<-as.data.frame(out_mat_samp)
-    rm(out_mat_samp)
+    
+    out_mat_mat<-as.data.frame(out_mat_samp_misscode)
     rownames(out_mat_mat)<-out_mat_mat$Sample
     out_mat_mat<-out_mat_mat[,-1]
-    ggh<-ggheatmap(as.matrix(out_mat_mat),
-                   k_row = 2, k_col = 2, 
-                   seriate = "mean", 
-                   fontsize_row = 6, fontsize_col = 5, 
-                   column_text_angle = 90,  
-                   na.value = "white",
-                   key.title="Paralogy (%)")
-    ggsave(paste0(outdir,"/","paralogy_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
-    
+    # order for rows
+    Rowv  <- out_mat_mat %>% dist %>% hclust %>% as.dendrogram %>%
+        set("branches_k_color", k = 4) %>% set("branches_lwd", 1.2) %>%
+        ladderize
+    # Order for columns: We must transpose the data
+    Colv  <- out_mat_mat %>% t %>% dist %>% hclust %>% as.dendrogram %>%
+        set("branches_k_color", k = 3) %>%
+        set("branches_lwd", 1.2) %>%
+        ladderize
+    out_mat_mat<-as.data.frame(out_mat_samp)
+    rownames(out_mat_mat)<-out_mat_mat$Sample
+    out_mat_mat<-out_mat_mat[,-1]
+    pdf(paste0(outdir,"/paralogy_heatmap2_clustered.pdf"),width=40,height=20)
+    heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
+              col = c(viridisLite::viridis(100)),
+              Rowv = Rowv, Colv = Colv, 
+              cexRow = 0.4 + 1/log10(nrow(out_mat_mat)),
+              # cexCol = 0.8,
+              margins=c(10,30),
+              key.title = "",key.xlab = "Paralogy (%)")
+    dev.off()
     #missingness
     out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
         ggplot()+
@@ -89,21 +119,21 @@ collate<-function(samples,directory,outdir,force){
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/","missingness_heatmap.pdf"),width=28,height=20,units="cm")
     # clustered heatmap (using heatmaply)
-    out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
-        pivot_wider(names_from = qseqid ,values_from = missing_percent, values_fill = NA)
-    out_mat_mat<-as.data.frame(out_mat_samp)
-    rm(out_mat_samp)
-    rownames(out_mat_mat)<-out_mat_mat$Sample
-    out_mat_mat<-out_mat_mat[,-1]
-    ggh<-ggheatmap(as.matrix(out_mat_mat),
-                   k_row = 2, k_col = 2, 
-                   seriate = "mean", 
-                   fontsize_row = 6, fontsize_col = 5, 
-                   column_text_angle = 90,  
-                   na.value = "white",
-                   key.title="Missingness (%)")
-    ggsave(paste0(outdir,"/","missingness_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
-    
+    # out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
+    #     pivot_wider(names_from = qseqid ,values_from = missing_percent, values_fill = NA)
+    # out_mat_mat<-as.data.frame(out_mat_samp)
+    # rm(out_mat_samp)
+    # rownames(out_mat_mat)<-out_mat_mat$Sample
+    # out_mat_mat<-out_mat_mat[,-1]
+    # ggh<-ggheatmap(as.matrix(out_mat_mat),
+    #                k_row = 2, k_col = 2, 
+    #                seriate = "mean", 
+    #                fontsize_row = 6, fontsize_col = 5, 
+    #                column_text_angle = 90,  
+    #                na.value = "white",
+    #                key.title="Missingness (%)")
+    # ggsave(paste0(outdir,"/","missingness_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
+    # 
     
 ## Per-sample plots
    #plot missingness
@@ -197,19 +227,21 @@ p <- OptionParser(usage=" This script will take the CoverageStats output of VetT
 # Add a positional argument
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
 p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
-p <- add_option(p, c("-o","--outdir"), help="<Directory in which to write results. Defaults to current directory>",type="character",default=".")
+p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 # parse
 args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
-suppressMessages(suppressWarnings(require(heatmaply,quietly=TRUE,warn.conflicts=FALSE)))
+# suppressMessages(suppressWarnings(require(heatmaply,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(gplots,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts=FALSE)))
 
-collate(samples = args$samples,
+try(collate(samples = args$samples,
         directory = args$directory,
         outdir = args$outdir,
-        force = args$force)
+        force = args$force))
 
 
 
