@@ -205,7 +205,9 @@ CheckTargets<-function(blast_file,
                        multicopyTarget,
                        genelist){
                          
-  suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+  # suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+  suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
+  suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
 
   dat <- as_tibble(read.table(blast_file,header=T))
   dat <- dat %>%
@@ -213,8 +215,6 @@ CheckTargets<-function(blast_file,
            length >= min_fragment_length)
   if(!is.null(genelist)){
     gl <- scan(genelist,what="character")
-    dat <- dat[dat$qseqid %in% gl,]
-    if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
   }
   ## for cases where we have multiple copies of each gene in the target file, split the blast results by copy source and run analyses separately on each.
   if(multicopyTarget){
@@ -224,8 +224,14 @@ CheckTargets<-function(blast_file,
     output_prefix_OG <- output_prefix
     for (i in names(dat.list)){
       dat <- dat.list[[i]]
+      if(!is.null(genelist)){
+        dat <- dat[dat$qseqid %in% gl,]
+        if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
+      }
       ## put results for each copy in separate directory
-      if(!dir.exists(i)) dir.create(i)
+      if(!dir.exists(i)) {
+        dir.create(i)
+      }
       output_prefix <- paste0(i,"/",output_prefix_OG)
       if(file.exists(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"))){
         cat(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),"exists. Skipping.\n")
@@ -250,6 +256,10 @@ CheckTargets<-function(blast_file,
     }
     
   } else {
+    if(!is.null(genelist)){
+      dat <- dat[dat$qseqid %in% gl,]
+      if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
+    }
     cov_stats<-GetCoverageStats(dat,doCovPerChrom)
     if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" ) }
     write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
