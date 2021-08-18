@@ -126,7 +126,7 @@ p <- OptionParser(usage=" This script will take\n
    c. Remove any shorter than min_length\n
    d. Index the reference genome (if no index is present) and extract the supercontigs\n
    e. If keepLongSupercontigs=FALSE (the default), remove any supercontigs longer than max_length\n
-   f. Write a Fasta with your new supercontigs
+   f. Write a Fasta with your new supercontigs\n
   Run using Rscript, e.g.\n
   Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --genome my_genome.fa --output_prefix test --blacklist targets.remove.txt\n"
 )

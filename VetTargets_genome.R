@@ -204,6 +204,9 @@ CheckTargets<-function(blast_file,
                        doCovPerChrom,
                        multicopyTarget,
                        genelist){
+                         
+  suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+
   dat <- as_tibble(read.table(blast_file,header=T))
   dat <- dat %>%
     filter(pident >= min_pident,
@@ -267,12 +270,12 @@ CheckTargets<-function(blast_file,
 #### DONE DEFINING FUNCTIONS
 suppressMessages(suppressWarnings(require(optparse)))
 
-p <- OptionParser(usage=" This script will take a tabular blast result (-outfmt 6) with your target exons as the query and (draft) genome as the subject\n
+p <- OptionParser(usage="This script will take a tabular blast result (-outfmt 6) with your target exons as the query and (draft) genome as the subject\n
    ***WITH A HEADER LINE**\n
   and do the following:\n
    1. Find potential paralogs by identifying genes with good matches from more than one contig/chromosome segments in the reference genome\n
    2. Find potentially missing genes by identifying genes with no or few good matches in the reference genome\n
-   3. Find genes spanning huge introns\n
+   3. if --doIntronStats=TRUE, find genes spanning huge introns\n
   then\n
    4. if --doPlots=TRUE, create sets of simple segment plots to allow for visual inspection of blast alignments of genes failing and passing the above checks\n
    5. Output files listing names of targets passing or failing each check, and a file of 'clean' targets passing all checks\n
@@ -295,8 +298,6 @@ p <- add_option(p, c("--genelist"), help="<file listing genes to process>",type=
 
 # parse
 args<-parse_args(p)
-
-suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
 
 ## RUN
 CheckTargets(blast_file = args$blast_file,

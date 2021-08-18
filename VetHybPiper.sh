@@ -71,6 +71,7 @@ CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
  if [[ -f "$CONTIGS" ]]; then
     echo "collated contigs exist for ${i}. Skipping."
  else
+ echo "collating contigs for ${i}"
     while read g; do
         if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
             gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
@@ -79,9 +80,10 @@ CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
     done < ${DIR}/${GENES} > ${CONTIGS}
 
     if [[ ${DEDUPE} == "TRUE" ]]; then
-      dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY}
-      rm ${CONTIGS}
-      mv ${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta ${CONTIGS}
+    echo "Done collating contigs for ${i}. Now deduplicating."
+      dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${CONTIGS}.dedupe.log
+      # rm ${CONTIGS}
+      # mv ${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta ${CONTIGS}
     fi
  fi
 done < ${DIR}/${SAMPLES}
@@ -93,7 +95,11 @@ while read i;do
  if [[ -f "$BLASTOUT" ]]; then
     echo "blast output exists for ${i}. Skipping."
  else   
-      SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+      if [[ ${DEDUPE} == "TRUE" ]]; then
+         SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta
+      else
+         SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+      fi
 
     blastn -query ${TARGETS} \
         -subject ${SUBJECT} \
@@ -129,7 +135,7 @@ while read i;do
     --doIntronStats ${DO_INTRON} \
     --doCovPerChrom ${DO_PER_CHROM} \
     --multicopyTarget ${MULTI} \
-    --genelist ${GENES}
+    --genelist ${DIR}/${GENES}
  fi
 done < ${DIR}/${SAMPLES}
 
