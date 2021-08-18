@@ -135,9 +135,10 @@ FindIntrons<-function(data,max_intron_length,max_intron_percent){
 }
 
 PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
-  pdf(paste0(output_prefix,"_plots.pdf"),width=10)
+  pdf(paste0(output_prefix,"_plots.pdf"),width=15)
+  cat("Making synteny plots. It's kinda hard work. Please bear with me :)\n")
   for(i in unique(data$qseqid)){
-    
+    cat("Plotting",i,"\n")
     temp<-data %>% 
       filter(qseqid==i)
     # don't plot if it won't fit in the plot area
@@ -201,12 +202,18 @@ CheckTargets<-function(blast_file,
                        doPlots,
                        doIntronStats,
                        doCovPerChrom,
-                       multicopyTarget){
-  dat<-as_tibble(read.table(blast_file,header=T))
-  dat<-dat %>%
+                       multicopyTarget,
+                       genelist){
+  dat <- as_tibble(read.table(blast_file,header=T))
+  dat <- dat %>%
     filter(pident >= min_pident,
            length >= min_fragment_length)
-  ## for cases where we have multiple copies of each gene in the target file, split the blast results by copy source
+  if(!is.null(genelist)){
+    gl <- scan(genelist,what="character")
+    dat <- dat[dat$qseqid %in% gl,]
+    if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
+  }
+  ## for cases where we have multiple copies of each gene in the target file, split the blast results by copy source and run analyses separately on each.
   if(multicopyTarget){
     dat <- dat %>% separate(col = qseqid, into = c("Source","qseqid"), sep = "-")
     sp <- dat$Source
@@ -218,7 +225,7 @@ CheckTargets<-function(blast_file,
       if(!dir.exists(i)) dir.create(i)
       output_prefix <- paste0(i,"/",output_prefix_OG)
       if(file.exists(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"))){
-        cat(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),"exists. Skipping.")
+        cat(paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),"exists. Skipping.\n")
       }else{
         cov_stats<-GetCoverageStats(dat,doCovPerChrom)
         if(doCovPerChrom){ 
@@ -267,7 +274,7 @@ p <- OptionParser(usage=" This script will take a tabular blast result (-outfmt 
    2. Find potentially missing genes by identifying genes with no or few good matches in the reference genome\n
    3. Find genes spanning huge introns\n
   then\n
-   4. Create sets of simple segment plots to allow for visual inspection of blast alignments of genes failing and passing the above checks\n
+   4. if --doPlots=TRUE, create sets of simple segment plots to allow for visual inspection of blast alignments of genes failing and passing the above checks\n
    5. Output files listing names of targets passing or failing each check, and a file of 'clean' targets passing all checks\n
   Run using Rscript, e.g.\n
   Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --min_fragment_length 50 --min_pident 80 --max_intron_length 10000 --max_intron_percent 60 --output_prefix test")
@@ -284,6 +291,7 @@ p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logic
 p <- add_option(p, c("--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=TRUE>",type="logical",default=FALSE)
+p <- add_option(p, c("--genelist"), help="<file listing genes to process>",type="character",default=NULL)
 
 # parse
 args<-parse_args(p)
@@ -302,7 +310,8 @@ CheckTargets(blast_file = args$blast_file,
              doPlots = args$doPlots,
              doIntronStats = args$doIntronStats,
              doCovPerChrom = args$doCovPerChrom,
-             multicopyTarget = args$multicopyTarget)
+             multicopyTarget = args$multicopyTarget,
+             genelist = args$genelist)
 
 
 

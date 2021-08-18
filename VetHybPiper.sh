@@ -1,54 +1,74 @@
-## Bash script to use TargetVet to detect paralogs from data for many samples that have been 
-## assembled by HybPiper
+#!/bin/bash
+usage(){
+   echo "## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper.
 ## ARGUMENTS
 #  -V **absolute** directory of VetTargets code: without trailing "/"
-#  -D **absolute** directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/"
+#  -D directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/". Can be '.' if current directory.
+#  -O Output directory suffix. output will be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
 #  -T targets fasta (nucleotide): must be in directory specified in -D
-#  -O output directory. defaults to VetTargets_genome_output
-#  -G file listing gene names to process: must be in directory specified in -D
-#  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene.
 #  -S file listing sample names to process: must be in directory specified in -D
-#  -L minimum length of blast matches to keep for analysis
+#  -G file listing gene names to process: must be in directory specified in -D
+#  -L minimum length of blast matches to keep for analysis. Default 150bp.
 #  -I do IntronStats? default = TRUE
+#  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. e.g. gene001.)
+#  -F force overwrite of DetectParalogs.R output? default = TRUE
+#  -C do per-chromosome/scaffold stats? default = TRUE
+#  -d deduplicate contigs before running analysis? default = FALSE. (Must have bbmap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
+#  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
+"
+}
+if [ -z "$1" ] || [[ $1 == -h ]] || [[ $1 == --help ]]; then
+	usage
+	exit
+fi
 
 
 ## set defaults
 LENGTH=100
 DO_INTRON=TRUE
 DO_PER_CHROM=TRUE
-MULTI=0
-OUTDIR=VetTargets_genome_output
+DEDUPE=FALSE
+MINIDENTITY=97
+LENGTH=150
+FORCE=TRUE
 ## parse args
-while getopts V:D:T:S:G:L:I:C:M:O: option
+while getopts V:D:T:S:G:L:I:C:d:m:O:M:F: option
 do
 case "${option}"
 in
 
 V) VETDIR=${OPTARG};;
 D) DIR=${OPTARG};;
-O) OUTDIR=${OPTARG};;
 T) TARGETS=${OPTARG};;
 S) SAMPLES=${OPTARG};;
 G) GENES=${OPTARG};;
-M) MULTI=${OPTARG};;
 L) LENGTH=${OPTARG};;
 I) DO_INTRON=${OPTARG};;
 C) DO_PER_CHROM=${OPTARG};;
+d) DEDUPE=${OPTARG};;
+m) MINIDENTITY=${OPTARG};;
+O) OUTSUFFIX=${OPTARG};;
+M) MULTI=${OPTARG};;
+F) FORCE=${OPTARG};;
 
 esac
 done
 
-# if [[ ${MULTI} == "TRUE" ]]; then
-#    cut -d'-' -f2 ${DIR}/${GENES} > ${DIR}/${GENES}.genenames
-# else
-#    cp ${DIR}/${GENES} ${DIR}/${GENES}.genenames
-# fi
+if [[ ${DIR} == "." ]]; then
+   DIR=$PWD
+fi
+
+if [[ ${DEDUPE} == "TRUE" ]]; then
+   OUTDIR=${DIR}/TargetVet_results_deduped_${MINIDENTITY}_${OUTSUFFIX}
+else
+   OUTDIR=${DIR}/TargetVet_results_${OUTSUFFIX}
+fi
 
 # 1. make TargetVet results folder and collate spades scaffolds per sample
-mkdir -p ${DIR}/TargetVet_results/assemblies_collated
+mkdir -p ${OUTDIR}/assemblies_collated
 while read i;do
- FILE=${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta
- if [[ -f "$FILE" ]]; then
+CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+ if [[ -f "$CONTIGS" ]]; then
     echo "collated contigs exist for ${i}. Skipping."
  else
     while read g; do
@@ -56,36 +76,45 @@ while read i;do
             gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
         fi
         cat ${DIR}/${i}/${g}/${g}_contigs.fasta
-    done < ${DIR}/${GENES}.genenames > ${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta
+    done < ${DIR}/${GENES} > ${CONTIGS}
+
+    if [[ ${DEDUPE} == "TRUE" ]]; then
+      dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY}
+      rm ${CONTIGS}
+      mv ${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta ${CONTIGS}
+    fi
  fi
 done < ${DIR}/${SAMPLES}
 
 # 2. blast to TARGETS
-mkdir -p ${DIR}/TargetVet_results/blast_out
+mkdir -p ${OUTDIR}/blast_out
 while read i;do
- FILE=${DIR}/TargetVet_results/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
- if [[ -f "$FILE" ]]; then
+ BLASTOUT=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+ if [[ -f "$BLASTOUT" ]]; then
     echo "blast output exists for ${i}. Skipping."
- else
+ else   
+      SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+
     blastn -query ${TARGETS} \
-        -subject ${DIR}/TargetVet_results/assemblies_collated/${i}_all_contigs.fasta \
-        -out ${DIR}/TargetVet_results/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt \
+        -subject ${SUBJECT} \
+        -out ${BLASTOUT} \
         -evalue 1e-6 \
         -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
  fi
 done < ${DIR}/${SAMPLES}
 
 # 3. run VetTargets_genome.R with --doPlots FALSE
-mkdir -p ${DIR}/TargetVet_results/${OUTDIR}
-cd ${DIR}/TargetVet_results/${OUTDIR}
+mkdir -p ${OUTDIR}/VetTargets_genome_output
+cd ${OUTDIR}/VetTargets_genome_output
+
+
 while read i;do
- FILE=${i}_CoverageStats_AcrossChromosomes.txt
- if [[ -f "$FILE" ]]; then
+ if [[ -f "$COVSTATS" ]]; then
     echo "VetTargets_genome output exists for ${i}. Skipping."
  else
     echo "running VetTargets_genome on ${i}"
-    BL=${DIR}/TargetVet_results/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
-    BLH=${DIR}/TargetVet_results/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
+    BL=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+    BLH=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
     echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
         cat - ${BL} > ${BLH}
     
@@ -98,7 +127,9 @@ while read i;do
     --min_display_intron 1 \
     --doPlots FALSE \
     --doIntronStats ${DO_INTRON} \
-    --doCovPerChrom ${DO_PER_CHROM}
+    --doCovPerChrom ${DO_PER_CHROM} \
+    --multicopyTarget ${MULTI} \
+    --genelist ${GENES}
  fi
 done < ${DIR}/${SAMPLES}
 
@@ -108,6 +139,21 @@ done < ${DIR}/${SAMPLES}
 # AND
 # 6. Output genelists for paralogs and single-copy
 
+if [[ ${MULTI} == "TRUE" ]]; then
+   # get prefixes so as to check for pre-existing covstats and run DetectParalogs.R on each separately
+   i=`head -n1 ${DIR}/${SAMPLES}`
+   BL=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+   cut -d'-' -f1 ${BL} | sort | uniq > targetsourcenames.txt
+fi
+
 echo "Detecting paralogs..."
-Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${DIR}/TargetVet_results/${OUTDIR}
+if [[ ${MULTI} == "TRUE" ]]; then
+   while read TSN; do
+      echo "working on $TSN"
+      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/VetTargets_genome_output/${TSN}/DetectParalogs_output -f ${FORCE}
+      echo "finished $TSN"
+  done < targetsourcenames.txt
+else
+   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE}
+fi
 echo "All done."
