@@ -1,5 +1,5 @@
 
-collate<-function(samples,directory,outdir,force){
+collate<-function(samples,directory,outdir,force,phylogeny){
     
     if(dir.exists(outdir)){
         if(!force){
@@ -97,12 +97,12 @@ collate<-function(samples,directory,outdir,force){
     # order for rows
     Rowv  <- out_mat_mat %>% dist %>% hclust %>% as.dendrogram %>%
         set("branches_k_color", k = 4) %>% set("branches_lwd", 1.2) %>%
-        ladderize
+        dendextend::ladderize()
     # Order for columns: We must transpose the data
     Colv  <- out_mat_mat %>% t %>% dist %>% hclust %>% as.dendrogram %>%
         set("branches_k_color", k = 4) %>%
         set("branches_lwd", 1.2) %>%
-        ladderize
+        dendextend::ladderize()
     out_mat_mat<-as.data.frame(out_mat_samp)
     rownames(out_mat_mat)<-out_mat_mat$Sample
     out_mat_mat<-out_mat_mat[,-1]
@@ -110,16 +110,65 @@ collate<-function(samples,directory,outdir,force){
     heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
               col = c(viridisLite::viridis(100)),
               Rowv = Rowv, Colv = Colv, 
-              cexRow = 0.4 + 1/log10(nrow(out_mat_mat)),
-              cexCol = 1/sqrt(nrow(out_mat_mat)),
+              cexRow = 1 + 1/log10(nrow(out_mat_mat)),
+              cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
               margins=c(10,20),
               key.title = "",
               key.xlab = "Paralogy (%)",
+              key.par=list(cex.lab=2),
               adjRow = c(0,0.5),
-              adjCol = c(1,0.5),
+              adjCol = c(0,0.5),
               offsetRow = 0.5,
               offsetCol = 0.5)
     dev.off()
+    
+    #####################
+    ##### PHYLOGENY #####      
+    #####################
+    if(!is.null(phylogeny)){
+        ## load tree and plot
+        tree<-read.tree(phylogeny)
+        dend_initial<-as.dendrogram(chronos(multi2di(tree)))
+        dend_initial.ord<-dend_initial %>%
+            set("branches_k_color", k = 4) %>% set("branches_lwd", 1.2)  %>%
+            dendextend::ladderize(T)
+        dendromatnames<-left_join(data.frame(tipnames=labels(dend_initial.ord)),
+                                  data.frame(tipnames=rownames(out_mat_mat)),
+                                  by="tipnames")
+        # we make a matrix with rows following the order in which the samples appear in the phylogeny
+        out_mat_mat_dendro_order<-out_mat_mat[match(dendromatnames$tipnames,rownames(out_mat_mat)),]
+        # pdf(paste0(outdir,"/paralogy_heatmap2_clustered_phylo_",basename(phylogeny),".pdf"),width=40,height=20)
+        pdf(paste0(outdir,"/paralogy_heatmap2_clustered_phylogeny.pdf"),width=40,height=20)
+        heatmap.2(as.matrix(out_mat_mat_dendro_order),
+                  Rowv = dend_initial.ord,
+                  Colv = Colv,
+                  scale = "none", col = c(viridisLite::viridis(100)),
+                  trace = "none", density.info = "none",
+                  cexRow = 1 + 1/log10(nrow(out_mat_mat)),
+                  cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
+                  margins=c(10,20),
+                  key.title = "",
+                  key.xlab = "Paralogy (%)",
+                  key.par=list(cex.lab=2),
+                  adjRow = c(0,0.5),
+                  adjCol = c(0,0.5),
+                  offsetRow = 0.5,
+                  offsetCol = 0.5)
+        dev.off()
+        ##Tanglegram plotting
+        obs.rf<-dist.dendlist(dendlist(Rowv,dend_initial.ord))
+        pdf(paste0(outdir,"/phylogeny_vs_clustogram_paralogy_tanglegram.pdf"),width=14,height=7)
+        dendextend::tanglegram(Rowv,dend_initial.ord,margin_inner = 4, lwd = 2, axes=F, 
+                               main_left = "Paralogy clusters",
+                               main_right= paste0("Given phylogeny\n",basename(phylogeny)),
+                               highlight_distinct_edges = F,
+                               common_subtrees_color_lines = F,
+                               highlight_branches_lwd = F,
+                               cex_main=1,
+                               sub=paste0("Robinson-Foulds distance = ",obs.rf))
+        dev.off()
+    }
+    
     ###############
     # missingness #
     ###############
@@ -141,24 +190,25 @@ collate<-function(samples,directory,outdir,force){
     # order for rows
     Rowv  <- out_mat_mat %>% dist %>% hclust %>% as.dendrogram %>%
         set("branches_k_color", k = 4) %>% set("branches_lwd", 1.2) %>%
-        ladderize
+        dendextend::ladderize()
     # Order for columns: We must transpose the data
     Colv  <- out_mat_mat %>% t %>% dist %>% hclust %>% as.dendrogram %>%
         set("branches_k_color", k = 4) %>%
         set("branches_lwd", 1.2) %>%
-        ladderize
+        dendextend::ladderize()
 
     pdf(paste0(outdir,"/missingness_heatmap2_clustered.pdf"),width=40,height=20)
     heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
               col = c(viridisLite::viridis(100)),
               Rowv = Rowv, Colv = Colv, 
-              cexRow = 0.4 + 1/log10(nrow(out_mat_mat)),
-              cexCol = 1/sqrt(nrow(out_mat_mat)),
+              cexRow = 1 + 1/log10(nrow(out_mat_mat)),
+              cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
               margins=c(10,20),
               key.title = "",
               key.xlab = "Missingness (%)",
+              key.par=list(cex.lab=2),
               adjRow = c(0,0.5),
-              adjCol = c(1,0.5),
+              adjCol = c(0,0.5),
               offsetRow = 0.5,
               offsetCol = 0.5)
     dev.off()
@@ -254,9 +304,10 @@ p <- OptionParser(usage=" This script will take the CoverageStats output of VetT
                         many samples and detect paralogs in a targeted set of genes ")
 # Add a positional argument
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
-p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
+p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character",default=getwd())
 p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
+p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)
 # parse
 args<-parse_args(p)
 
@@ -266,10 +317,14 @@ suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=
 suppressMessages(suppressWarnings(require(gplots,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts=FALSE)))
 
+if(!is.null(args$phylogeny)) suppressMessages(suppressWarnings(require(ape,quietly=TRUE,warn.conflicts=FALSE)))
+
+
 try(collate(samples = args$samples,
         directory = args$directory,
         outdir = args$outdir,
-        force = args$force))
+        force = args$force,
+        phylogeny = args$phylogeny))
 
 
 
