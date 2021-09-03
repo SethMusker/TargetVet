@@ -1,4 +1,3 @@
-#!/bin/Rscript
 suppressMessages(suppressWarnings(require(optparse)))
 
 filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_median=NULL){
