@@ -17,7 +17,7 @@ usage(){
    #  -d deduplicate contigs before running analysis? default = FALSE. (Must have bbmap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
    #  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
    #  -i file listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). A separate paralog detection analysis will be conducted using only the ingroup samples.
-   #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
+   #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap using this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
    "
 }
 if [ -z "$1" ] || [[ $1 == -h ]] || [[ $1 == --help ]]; then
@@ -168,8 +168,5 @@ if [[ ${MULTI} == "TRUE" ]]; then
 else
    Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
 fi
-
-INGROUP
-
 
 echo "All done."
