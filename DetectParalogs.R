@@ -1,12 +1,12 @@
 
-collate<-function(samples,directory,outdir,force,phylogeny){
+collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     
     if(dir.exists(outdir)){
         if(!force){
             stop("Specified output directory exists.\nTerminating. Use -f TRUE to overwrite.\n")
         }else{
             cat("Specified output directory exists.\n")
-            cat("Will overwrite. \n(If it fails it's because the output file is open on your computer somewhere. Close and rerun.)\n")
+            cat("Will overwrite. (If it fails it's because the output file is open on your computer somewhere. Close  and rerun.)\n")
         }
     }else{
         cat("Specified output directory exists not. Will attempt to create it.\n")
@@ -39,7 +39,7 @@ collate<-function(samples,directory,outdir,force,phylogeny){
     out_meanSort$seg.pred<-predict(seg.mean,newdata=data.frame(orderMean=out_meanSort$orderMean))
     out_meanSort$resid<-out_meanSort$paralog_percent_ignoreMissing - out_meanSort$seg.pred
     out_meanSort$resid_sq<-out_meanSort$resid^2
-    
+
     #####################
     ### BEGIN PLOTTING ##
     #####################
@@ -55,9 +55,12 @@ collate<-function(samples,directory,outdir,force,phylogeny){
         geom_line(aes(x=orderMean,y=seg.pred))+
         geom_vline(xintercept = seg.mean$psi[2],lty=2)+
         labs(y="Paralog Rate (%)",x="Target") 
-    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint.pdf"),width=40,height=20,units = "cm")
+    ggsave(paste0(outdir,"/breakpoint_paralog_percent_ignoreMissing.pdf"),width=40,height=20,units = "cm")
     
-    ## HEATMAPS
+    ###############
+    ## HEATMAPS ###
+    ###############
+    
     ###############
     ### paralogy ##
     ###############
@@ -273,21 +276,51 @@ collate<-function(samples,directory,outdir,force,phylogeny){
         labs(y="Obs - Exp Paralog Rate for breakpoint regression with 1 inflection point")+
         ggtitle("Putative paralogs removed")
     ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint_RESIDUALS_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
+
+    
+    # Ingroup stuff #
+    if(!is.null(ingroup)){
+        ingr<-scan(ingroup,what="character")
+        out_meanSort_ingroup<-out_meanSort[out_meanSort$Sample %in% ingr,]
+        if(nrow(out_meanSort_ingroup) == 0) stop("the names in your ingroup file don't match those in the samples file")
+        out_meanSort_ingroup$orderMean<-sapply(out_meanSort_ingroup$qseqid,function(x) {
+            y<-which(levels(out_meanSort_ingroup$qseqid)==x)
+            return(y)})
+        lm.mean<-lm(paralog_percent_ignoreMissing~orderMean,data=out_meanSort_ingroup) # DON'T force intercept=0
+        seg.mean<-segmented(lm.mean,npsi=1)
+        out_meanSort_ingroup$seg.pred<-predict(seg.mean,newdata=data.frame(orderMean=out_meanSort_ingroup$orderMean))
+        out_meanSort_ingroup$resid<-out_meanSort_ingroup$paralog_percent_ignoreMissing - out_meanSort_ingroup$seg.pred
+        out_meanSort_ingroup$resid_sq<-out_meanSort_ingroup$resid^2      
+    
+        ##plot breakpoint analysis
+        out_meanSort_ingroup %>%
+            ggplot(aes(x=qseqid,y=paralog_percent_ignoreMissing))+
+            theme_bw()+
+            geom_point(aes(colour=missing_percent),alpha=0.5)+
+            geom_smooth(aes(x=qseqid,y=paralog_percent_ignoreMissing),method=loess) +
+            scale_colour_viridis_c("Missingness (%)",option="D")+
+            theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5))+
+            geom_line(aes(x=orderMean,y=seg.pred))+
+            geom_vline(xintercept = seg.mean$psi[2],lty=2)+
+            labs(y="Paralog Rate (%)",x="Target") 
+        ggsave(paste0(outdir,"/breakpoint_paralog_percent_ignoreMissing_ingroup.pdf"),width=40,height=20,units = "cm")
+    }
+    # ----
+    
     #####################
     ### DONE PLOTTING ###
     #####################
     
+    out_meanSort %>% group_by(qseqid) %>% arrange(paralog_percent_ignoreMissing,.by_group=TRUE) %>%
+    write.table(paste0(outdir,"/paralogy_details.txt"),quote=F,row.names=F,sep="\t")
+
     out_meanSort_summary<-out_meanSort %>% group_by(qseqid) %>%
         summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
                     mean_missing_percent=round(mean(missing_percent),1),
                     mean_paralogy_index=round(mean(paralogy_index),1),
                     diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
                     .groups="keep")
-    
     write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary.txt"),
-                quote=F,row.names=F,sep="\t")
-    out_meanSort %>% group_by(qseqid) %>% arrange(paralog_percent_ignoreMissing,.by_group=TRUE) %>%
-    write.table(paste0(outdir,"/paralogy_details.txt"),
                 quote=F,row.names=F,sep="\t")
     
     out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
@@ -296,7 +329,26 @@ collate<-function(samples,directory,outdir,force,phylogeny){
     out_meanSort_summary %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
         write.table(paste0(outdir,"/singleCopy_list.txt"),
                     quote=F,row.names=F,col.names=F,sep="\t")
+
+    if(!is.null(ingroup)){
+        out_meanSort_summary<-out_meanSort_ingroup %>% group_by(qseqid) %>%
+            summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
+                        mean_missing_percent=round(mean(missing_percent),1),
+                        mean_paralogy_index=round(mean(paralogy_index),1),
+                        diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
+                        .groups="keep")
+        write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary_ingroup.txt"),
+                    quote=F,row.names=F,sep="\t")
+        out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
+        write.table(paste0(outdir,"/paralog_list_ingroup.txt"),
+                    quote=F,row.names=F,col.names=F,sep="\t")
+        out_meanSort_summary %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
+        write.table(paste0(outdir,"/singleCopy_list_ingroup.txt"),
+                    quote=F,row.names=F,col.names=F,sep="\t")
+    }
 }
+
+
 
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
 
@@ -308,6 +360,7 @@ p <- add_option(p, c("-d","--directory"), help="<Required: directory with output
 p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)
+p <- add_option(p, c("-i","--ingroup"), help="<File listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). \nA separate paralog detection analysis will be conducted using only the ingroup samples.>",type="character",default=NULL)
 # parse
 args<-parse_args(p)
 
@@ -324,7 +377,8 @@ try(collate(samples = args$samples,
         directory = args$directory,
         outdir = args$outdir,
         force = args$force,
-        phylogeny = args$phylogeny))
+        phylogeny = args$phylogeny,
+        ingroup = args$ingroup))
 
 
 

@@ -1,21 +1,24 @@
 #!/bin/bash
 usage(){
    echo "## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper.
-## ARGUMENTS
-#  -V **absolute** directory of VetTargets code: without trailing "/"
-#  -D directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/". Can be '.' if current directory.
-#  -O Output directory suffix. output will be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
-#  -T targets fasta (nucleotide): must be in directory specified in -D
-#  -S file listing sample names to process: must be in directory specified in -D
-#  -G file listing gene names to process: must be in directory specified in -D
-#  -L minimum length of blast matches to keep for analysis. Default 150bp.
-#  -I do IntronStats? default = TRUE
-#  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. e.g. gene001.)
-#  -F force overwrite of DetectParalogs.R output? default = TRUE
-#  -C do per-chromosome/scaffold stats? default = TRUE
-#  -d deduplicate contigs before running analysis? default = FALSE. (Must have bbmap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
-#  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
-"
+   ## ARGUMENTS
+   #  -V **absolute** directory of VetTargets code: without trailing "/"
+   #  -D directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/". Can be '.' if current directory.
+   #  -O output directory suffix. output will be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
+   #  -T targets fasta (nucleotide): must be in directory specified in -D
+   #  -S file listing sample names to process: must be in directory specified in -D
+   #  -G file listing gene names to process: must be in directory specified in -D
+   #  -L minimum length of blast matches to keep for analysis. Default = 150bp.
+   #  -K minimum percent identity (pident) of blast matches to keep for analysis. Default = 70.
+   #  -I do IntronStats? default = TRUE
+   #  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. e.g. gene001.)
+   #  -F force overwrite of DetectParalogs.R output? default = TRUE
+   #  -C do per-chromosome/scaffold stats? default = TRUE
+   #  -d deduplicate contigs before running analysis? default = FALSE. (Must have bbmap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
+   #  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
+   #  -i file listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). A separate paralog detection analysis will be conducted using only the ingroup samples.
+   #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
+   "
 }
 if [ -z "$1" ] || [[ $1 == -h ]] || [[ $1 == --help ]]; then
 	usage
@@ -24,15 +27,15 @@ fi
 
 
 ## set defaults
-LENGTH=100
 DO_INTRON=TRUE
 DO_PER_CHROM=TRUE
 DEDUPE=FALSE
 MINIDENTITY=97
 LENGTH=150
+PIDENT=70
 FORCE=TRUE
 ## parse args
-while getopts V:D:T:S:G:L:I:C:d:m:O:M:F: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p: option
 do
 case "${option}"
 in
@@ -43,6 +46,7 @@ T) TARGETS=${OPTARG};;
 S) SAMPLES=${OPTARG};;
 G) GENES=${OPTARG};;
 L) LENGTH=${OPTARG};;
+K) PIDENT=${OPTARG};;
 I) DO_INTRON=${OPTARG};;
 C) DO_PER_CHROM=${OPTARG};;
 d) DEDUPE=${OPTARG};;
@@ -50,6 +54,8 @@ m) MINIDENTITY=${OPTARG};;
 O) OUTSUFFIX=${OPTARG};;
 M) MULTI=${OPTARG};;
 F) FORCE=${OPTARG};;
+i) INGROUP=${OPTARG};;
+p) PHYLO=${OPTARG};;
 
 esac
 done
@@ -127,7 +133,7 @@ while read i;do
     Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
     --output_prefix ${i} \
     --min_fragment_length ${LENGTH} \
-    --min_pident 60 \
+    --min_pident ${PIDENT} \
     --max_intron_length 10000 \
     --max_intron_percent 1 \
     --min_display_intron 1 \
@@ -156,10 +162,14 @@ echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
       echo "working on $TSN"
-      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/VetTargets_genome_output/${TSN}/DetectParalogs_output -f ${FORCE}
+      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/VetTargets_genome_output/${TSN}/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
       echo "finished $TSN"
   done < targetsourcenames.txt
 else
-   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE}
+   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
 fi
+
+INGROUP
+
+
 echo "All done."
