@@ -62,7 +62,11 @@ Automated identification of paralogs is attempted via breakpoint regression on t
 
 In cases where you have targets designed based on outgroup taxa and several outgroup taxa in the dataset, the patterns of paralogy they show may be quite different from those in your ingroup taxa. As such, you can provide a list of the sample names of the ingroup taxa, in which case another, separate breakpoint analysis will be conducted only on them. This could hellp a lot to reduce the noise in the data and identify paralogs more accurately.
 
-# Designing a project:  **`VetTargets_genome.R`** and **`VetTargets_WGS.R`**
+![g84089](https://user-images.githubusercontent.com/16952350/133785807-5f62faa7-a47d-428a-b937-e7a1d755afad.png)
+**Figure 1**: A heatmap of paralogy estimates showing how `DetectParalogs.R` groups genes based on their shared paralogy patterns, and how paralogy estimates vary with phylogeny (at left is the species tree estimated by Johnson et al. (2016)).
+
+# Designing a project: **`VetTargets_genome.R`** and **`VetTargets_WGS.R`**
+
 
 You're designing a target capture phylogenomics project and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many paralogs or other nasty surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
 
