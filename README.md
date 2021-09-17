@@ -12,21 +12,22 @@ TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) 
  4. Extract supercontigs to use as targets for phylogenetics in closely related species (or population genomics): `TargetSupercontigs.R`.
 
 # Dependencies
-The R scripts run on the command line via `Rscript`. The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for any UNIX-like OS.
+The R scripts run on the command line via `Rscript` (see examples below). The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for any UNIX-like OS.
 
 Dependencies:
 ```
 R (https://cran.r-project.org/)
 R packages:
-    progress
-    optparse
-    tidyverse
-    ggrepel
-    segmented
-    gplots
-    dendextend
-    Biostrings
-    Rsamtools
+    progress # for nice progress bars 
+    optparse # for parsing opts
+    tidyverse # main workhorses are dplyr and tidyr. Also loads ggplot which does most of the plotting.
+    ggrepel # useful for labeling plots
+    segmented # for automated paralog detection
+    gplots # for paralogy heatmaps 
+    dendextend # for plotting dendrograms and/or phylogenies
+    ape # for phylogenetic trees
+    Biostrings # for handling sequences
+    Rsamtools # for indexing and extracting sequences from reference genome(s)
 
 ##  To install these, run:
     install.packages(c("tidyverse","ggrepel","optparse","progress","segmented","gplots","dendextend"))
@@ -55,7 +56,11 @@ What does `VetHybPiper.sh` do? This:
 4. Across the sample set, run `DetectParalogs.R` on the previous step's output. If the reference fasta contains multiple copies of each target (in which case you need to specify `-M TRUE`), this will be done separately for each target source, with results output in separate folders named after each.
 
 ## How does `DetectParalogs.R` detect paralogs?
-It's a secret.
+In short, it looks for shared patterns of paralogy across samples. 
+
+Automated identification of paralogs is attempted via breakpoint regression on the raw paralogy percent estimates, with the independent variable being the order in which targets appear in the mean-paralogy-percent-sorted sequence. Hypothetically, the breakpoint should occur where the paralogy rate suddenly increases, or becomes consistently high. This is obviously quite crude, which is why `DetectParalogs.R` also makes lots of informative plots to help you visualise the data and make informed decisions about which genes to call paralogs and exclude (or phase into separate loci if you can't afford to drop them). 
+
+In cases where you have targets designed based on outgroup taxa and several outgroup taxa in the dataset, the patterns of paralogy they show may be quite different from those in your ingroup taxa. As such, you can provide a list of the sample names of the ingroup taxa, in which case another, separate breakpoint analysis will be conducted only on them. This could hellp a lot to reduce the noise in the data and identify paralogs more accurately.
 
 # Designing a project:  **`VetTargets_genome.R`** and **`VetTargets_WGS.R`**
 
