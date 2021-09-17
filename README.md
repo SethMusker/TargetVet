@@ -49,7 +49,7 @@ You will need to have the BLAST+ bin in your path.
 
 Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I added this in because I have found that `HybPiper` contigs often contain two (or more) **near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores**. I suspect that this is because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and that it is therefore assembling each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
 
-What does `VetHybPiper.sh` do? This:
+## What does `VetHybPiper.sh` do?
 1. For each sample, fetch all the assembled contigs from the HybPiper output directory and collate them into a single all-target fasta.
 2. For each sample, nucleotide BLAST the contigs to the target fasta (the one you used as the reference for HybPiper).
 3. For each sample, run `VetTargets_genome.R` to calculate paralogy indices and more (see below). By default the script's plotting functionality if turned off as it can take a long time and is in this context not likely to be interesting. It can however be switched on using `-P TRUE`.

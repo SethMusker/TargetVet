@@ -15,7 +15,7 @@ usage(){
    
    ##--- The following arguments are OPTIONAL.
    #  -L minimum length of blast matches to keep for analysis. Default = 150bp.
-   #  -K minimum percent identity (pident) of blast matches to keep for analysis. Default = 70.
+   #  -K minimum percent identity (pident) of blast matches to Keep for analysis. Default = 70.
    #  -I do IntronStats? default = TRUE
    #  -F force overwrite of DetectParalogs.R output? default = TRUE
    #  -C do per-chromosome/scaffold stats? default = TRUE
@@ -23,6 +23,8 @@ usage(){
    #  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
    #  -i file listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). A separate paralog detection analysis will be conducted using only the ingroup samples.
    #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap using this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
+   #  -P do plots for each sample with VetTargets_genome.R? Time-consuming and not necessary. Default = FALSE.
+   #  -B what type of BLAST to use? OPtions currently are blastn or tblastx. The latter is potentially more sensitive but also much more time-consuming. Default = blastn.
    "
 }
 if [ -z "$1" ] || [[ $1 == -h ]] || [[ $1 == --help ]]; then
@@ -40,8 +42,9 @@ LENGTH=150
 PIDENT=70
 FORCE=TRUE
 DO_PLOTS=FALSE
+BLAST_TYPE=blastn
 ## parse args
-while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B: option
 do
 case "${option}"
 in
@@ -63,6 +66,7 @@ F) FORCE=${OPTARG};;
 i) INGROUP=${OPTARG};;
 p) PHYLO=${OPTARG};;
 P) DO_PLOTS=${OPTARG};;
+B) BLAST_TYPE=${OPTARG};;
 
 esac
 done
@@ -72,6 +76,7 @@ if [[ ${DIR} == "." ]]; then
 fi
 
 if [[ ${DEDUPE} == "TRUE" ]]; then
+   echo "Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus!\n Using MINIDENTITY=${MINIDENTITY}"
    OUTDIR=${DIR}/TargetVet_results_deduped_${MINIDENTITY}_${OUTSUFFIX}
 else
    OUTDIR=${DIR}/TargetVet_results_${OUTSUFFIX}
@@ -93,7 +98,6 @@ CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
     done < ${DIR}/${GENES} > ${CONTIGS}
 
     if [[ ${DEDUPE} == "TRUE" ]]; then
-    echo "Done collating contigs for ${i}. Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus!"
       dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${CONTIGS}.dedupe.log
     fi
  fi
@@ -112,11 +116,21 @@ while read i;do
          SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
       fi
 
-    blastn -query ${TARGETS} \
-        -subject ${SUBJECT} \
-        -out ${BLASTOUT} \
-        -evalue 1e-6 \
-        -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
+   if [[ ${BLAST_TYPE} == "tblastx" ]]; then
+      echo "Using tblastx.\n"
+      tblastx -query ${TARGETS} \
+         -subject ${SUBJECT} \
+         -out ${BLASTOUT} \
+         -evalue 1e-6 \
+         -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
+   else
+      echo "Using blastn.\n"
+      blastn -query ${TARGETS} \
+         -subject ${SUBJECT} \
+         -out ${BLASTOUT} \
+         -evalue 1e-6 \
+         -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"      
+   fi
  fi
 done < ${DIR}/${SAMPLES}
 
