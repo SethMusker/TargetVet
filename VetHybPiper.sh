@@ -117,14 +117,14 @@ while read i;do
       fi
 
    if [[ ${BLAST_TYPE} == "tblastx" ]]; then
-      echo "Using tblastx.\n"
+      echo "Using tblastx."
       tblastx -query ${TARGETS} \
          -subject ${SUBJECT} \
          -out ${BLASTOUT} \
          -evalue 1e-6 \
          -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
    else
-      echo "Using blastn.\n"
+      echo "Using blastn."
       blastn -query ${TARGETS} \
          -subject ${SUBJECT} \
          -out ${BLASTOUT} \
