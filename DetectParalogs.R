@@ -9,7 +9,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
             cat("Will overwrite. (If it fails it's because the output file is open on your computer somewhere. Close  and rerun.)\n")
         }
     }else{
-        cat("Specified output directory exists not. Will attempt to create it.\n")
+        cat("Specified output directory exists NOT. Will attempt to create it.\n")
         dir.create(outdir)
     }
     
@@ -34,7 +34,15 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     out_meanSort$orderMean<-sapply(out_meanSort$qseqid,function(x) {
         y<-which(levels(out_meanSort$qseqid)==x)
         return(y)})
-    lm.mean<-lm(paralog_percent_ignoreMissing~orderMean,data=out_meanSort) # DON'T force intercept=0
+    my_intercept <- min(out_meanSort$paralog_percent_ignoreMissing)
+    if(my_intercept==0){
+        my_formula<-formula(paralog_percent_ignoreMissing~orderMean+0)
+    }else{
+        my_formula<-formula(paralog_percent_ignoreMissing~orderMean)       
+    }
+    cat("minimum paralogy rate is",my_intercept,". Using the following formula to predict paralogs\n")
+    print(my_formula)
+    lm.mean<-lm(my_formula, data=out_meanSort) # Force intercept through minimum
     seg.mean<-segmented(lm.mean,npsi=1)
     out_meanSort$seg.pred<-predict(seg.mean,newdata=data.frame(orderMean=out_meanSort$orderMean))
     out_meanSort$resid<-out_meanSort$paralog_percent_ignoreMissing - out_meanSort$seg.pred
@@ -49,7 +57,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         ggplot(aes(x=qseqid,y=paralog_percent_ignoreMissing))+
         theme_bw()+
         geom_point(aes(colour=missing_percent),alpha=0.5)+
-        geom_smooth(aes(x=qseqid,y=paralog_percent_ignoreMissing),method=loess) +
+        # geom_smooth(aes(x=qseqid,y=paralog_percent_ignoreMissing),method=loess) +
         scale_colour_viridis_c("Missingness (%)",option="D")+
         theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5))+
         geom_line(aes(x=orderMean,y=seg.pred))+
@@ -70,21 +78,6 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/paralogy_heatmap.pdf"),width=28,height=20,units="cm")
-    # # clustered heatmap (using heatmaply) (Hard to implement with intention of using missingness as further clustering info)
-    # out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
-    #     pivot_wider(names_from = qseqid ,values_from = paralog_percent_ignoreMissing, values_fill = NA)
-    # out_mat_mat<-as.data.frame(out_mat_samp)
-    # rm(out_mat_samp)
-    # rownames(out_mat_mat)<-out_mat_mat$Sample
-    # out_mat_mat<-out_mat_mat[,-1]
-    # ggh<-ggheatmap(as.matrix(out_mat_mat),
-    #                k_row = 2, k_col = 2, 
-    #                seriate = "mean", 
-    #                fontsize_row = 6, fontsize_col = 5, 
-    #                column_text_angle = 90,  
-    #                na.value = "white",
-    #                key.title="Paralogy (%)")
-    # ggsave(paste0(outdir,"/","paralogy_heatmap_clustered.pdf"),width=28,height=20,units="cm",plot=ggh)
 
     # Clustered heatmap using gplots (heatmap2()) and dendextend
     out_mat_samp_misscode<-out_meanSort %>% select(qseqid,Sample,paralog_percent_ignoreMissing) %>%
@@ -140,7 +133,6 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
                                   by="tipnames")
         # we make a matrix with rows following the order in which the samples appear in the phylogeny
         out_mat_mat_dendro_order<-out_mat_mat[match(dendromatnames$tipnames,rownames(out_mat_mat)),]
-        # pdf(paste0(outdir,"/paralogy_heatmap2_clustered_phylo_",basename(phylogeny),".pdf"),width=40,height=20)
         pdf(paste0(outdir,"/paralogy_heatmap2_clustered_phylogeny.pdf"),width=40,height=20)
         heatmap.2(as.matrix(out_mat_mat_dendro_order),
                   Rowv = dend_initial.ord,
@@ -286,9 +278,18 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         out_meanSort_ingroup$orderMean<-sapply(out_meanSort_ingroup$qseqid,function(x) {
             y<-which(levels(out_meanSort_ingroup$qseqid)==x)
             return(y)})
-        lm.mean<-lm(paralog_percent_ignoreMissing~orderMean,data=out_meanSort_ingroup) # DON'T force intercept=0
-        seg.mean<-segmented(lm.mean,npsi=1)
-        out_meanSort_ingroup$seg.pred<-predict(seg.mean,newdata=data.frame(orderMean=out_meanSort_ingroup$orderMean))
+        my_intercept <- min(out_meanSort_ingroup$paralog_percent_ignoreMissing)
+        if(my_intercept==0){
+            my_formula<-formula(paralog_percent_ignoreMissing~orderMean+0)
+        }else{
+            my_formula<-formula(paralog_percent_ignoreMissing~orderMean)       
+        }
+        cat("INGROUP minimum paralogy rate is",my_intercept,". Using the following formula to predict paralogs\n")
+        print(my_formula)
+
+        lm.mean.ingroup<-lm(my_formula, data=out_meanSort_ingroup) # Force intercept through minimum
+        seg.mean.ingroup<-segmented(lm.mean.ingroup,npsi=1)
+        out_meanSort_ingroup$seg.pred<-predict(seg.mean.ingroup,newdata=data.frame(orderMean=out_meanSort_ingroup$orderMean))
         out_meanSort_ingroup$resid<-out_meanSort_ingroup$paralog_percent_ignoreMissing - out_meanSort_ingroup$seg.pred
         out_meanSort_ingroup$resid_sq<-out_meanSort_ingroup$resid^2      
     
@@ -297,13 +298,28 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
             ggplot(aes(x=qseqid,y=paralog_percent_ignoreMissing))+
             theme_bw()+
             geom_point(aes(colour=missing_percent),alpha=0.5)+
-            geom_smooth(aes(x=qseqid,y=paralog_percent_ignoreMissing),method=loess) +
+            # geom_smooth(aes(x=qseqid,y=paralog_percent_ignoreMissing),method=loess) +
             scale_colour_viridis_c("Missingness (%)",option="D")+
             theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5))+
             geom_line(aes(x=orderMean,y=seg.pred))+
-            geom_vline(xintercept = seg.mean$psi[2],lty=2)+
+            geom_vline(xintercept = seg.mean.ingroup$psi[2],lty=2)+
             labs(y="Paralog Rate (%)",x="Target") 
         ggsave(paste0(outdir,"/breakpoint_paralog_percent_ignoreMissing_ingroup.pdf"),width=40,height=20,units = "cm")
+
+        out_meanSort_summary_ingroup<-out_meanSort_ingroup %>% group_by(qseqid) %>%
+        summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
+                    mean_missing_percent=round(mean(missing_percent),1),
+                    mean_paralogy_index=round(mean(paralogy_index),2),
+                    diagnosis=ifelse(unique(orderMean)<=seg.mean.ingroup$psi[2],"Single","Paralog"),
+                    .groups="keep")
+        write.table(out_meanSort_summary_ingroup,paste0(outdir,"/paralogy_summary_ingroup.txt"),
+                    quote=F,row.names=F,sep="\t")
+        out_meanSort_summary_ingroup %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
+        write.table(paste0(outdir,"/paralog_list_ingroup.txt"),
+                    quote=F,row.names=F,col.names=F,sep="\t")
+        out_meanSort_summary_ingroup %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
+        write.table(paste0(outdir,"/singleCopy_list_ingroup.txt"),
+                    quote=F,row.names=F,col.names=F,sep="\t")
     }
     # ----
     
@@ -317,7 +333,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     out_meanSort_summary<-out_meanSort %>% group_by(qseqid) %>%
         summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
                     mean_missing_percent=round(mean(missing_percent),1),
-                    mean_paralogy_index=round(mean(paralogy_index),1),
+                    mean_paralogy_index=round(mean(paralogy_index),2),
                     diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
                     .groups="keep")
     write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary.txt"),
@@ -330,22 +346,6 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         write.table(paste0(outdir,"/singleCopy_list.txt"),
                     quote=F,row.names=F,col.names=F,sep="\t")
 
-    if(!is.null(ingroup)){
-        out_meanSort_summary<-out_meanSort_ingroup %>% group_by(qseqid) %>%
-            summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
-                        mean_missing_percent=round(mean(missing_percent),1),
-                        mean_paralogy_index=round(mean(paralogy_index),1),
-                        diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
-                        .groups="keep")
-        write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary_ingroup.txt"),
-                    quote=F,row.names=F,sep="\t")
-        out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
-        write.table(paste0(outdir,"/paralog_list_ingroup.txt"),
-                    quote=F,row.names=F,col.names=F,sep="\t")
-        out_meanSort_summary %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
-        write.table(paste0(outdir,"/singleCopy_list_ingroup.txt"),
-                    quote=F,row.names=F,col.names=F,sep="\t")
-    }
 }
 
 
@@ -366,7 +366,6 @@ args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
-# suppressMessages(suppressWarnings(require(heatmaply,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(gplots,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts=FALSE)))
 

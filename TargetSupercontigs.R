@@ -38,7 +38,7 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
     myindex<-read.table(paste0(genome,".fai"))
     if(any(! dat$sseqid %in% myindex[,1]) ){
       stop("Some or all sseqids in the blast file are not found in the genome's index. Have you got the right genome version? \n
-            If yes, consider deleting the index and rerunning to automatically reindex using Rsamtools (equivalent to samtools faidx).\n
+            If yes, consider deleting the index and rerunning this script, which will automatically reindex using Rsamtools (equivalent to samtools faidx).\n
             Exiting...\n")
     }else{
       if(!is.null(blacklist)){
@@ -117,7 +117,7 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
 
 p <- OptionParser(usage=" This script will take\n
-1. a tabular blast result (-outfmt 6) ***WITH A HEADER LINE** with your target exons as the query and (draft) genome as the subject\n
+1. a tabular blast result (-outfmt 6) ***WITH A HEADER LINE** (see the readme) with your target exons as the query and (draft) genome as the subject\n
 2. your genome fasta\n
 3. Optionally a blacklist of targets to ignore\n
   and do the following:\n
@@ -128,7 +128,7 @@ p <- OptionParser(usage=" This script will take\n
    e. If keepLongSupercontigs=FALSE (the default), remove any supercontigs longer than max_length\n
    f. Write a Fasta with your new supercontigs\n
   Run using Rscript, e.g.\n
-  Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --genome my_genome.fa --output_prefix test --blacklist targets.remove.txt\n"
+  Rscript TargetSupercontigs.R --blast_file blastn_targets_to_genome.txt --genome my_genome.fa --output_prefix test --blacklist targets.remove.txt\n"
 )
 # Add a positional argument
 p <- add_option(p, c("-b","--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject. **With Header!**>",type="character")

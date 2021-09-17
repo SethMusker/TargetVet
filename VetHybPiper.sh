@@ -1,20 +1,25 @@
 #!/bin/bash
 usage(){
    echo "## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper.
+   ## It also analyses and reports patterns of missingness, and plots all of these results in various ways.
    ## ARGUMENTS
-   #  -V **absolute** directory of VetTargets code: without trailing "/"
+  
+   ##--- The following are REQUIRED. 
+   #  -V **absolute** directory of VetTargets source code: without the trailing "/"
    #  -D directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/". Can be '.' if current directory.
    #  -O output directory suffix. output will be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
    #  -T targets fasta (nucleotide): must be in directory specified in -D
    #  -S file listing sample names to process: must be in directory specified in -D
    #  -G file listing gene names to process: must be in directory specified in -D
+   #  -M does the target fasta contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names in the target fasta must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. gene001, for example.)
+   
+   ##--- The following arguments are OPTIONAL.
    #  -L minimum length of blast matches to keep for analysis. Default = 150bp.
    #  -K minimum percent identity (pident) of blast matches to keep for analysis. Default = 70.
    #  -I do IntronStats? default = TRUE
-   #  -M does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. e.g. gene001.)
    #  -F force overwrite of DetectParalogs.R output? default = TRUE
    #  -C do per-chromosome/scaffold stats? default = TRUE
-   #  -d deduplicate contigs before running analysis? default = FALSE. (Must have bbmap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
+   #  -d deduplicate contigs before running analysis? default = FALSE. (Must have BBMap's dedupe.sh in current path. See https://sourceforge.net/projects/bbmap/)
    #  -m if -d=TRUE, min % identity threshold to identify duplicates? Default = 97 (to allow for removal of alleles.)
    #  -i file listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). A separate paralog detection analysis will be conducted using only the ingroup samples.
    #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap using this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
@@ -34,8 +39,9 @@ MINIDENTITY=97
 LENGTH=150
 PIDENT=70
 FORCE=TRUE
+DO_PLOTS=FALSE
 ## parse args
-while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P: option
 do
 case "${option}"
 in
@@ -56,6 +62,7 @@ M) MULTI=${OPTARG};;
 F) FORCE=${OPTARG};;
 i) INGROUP=${OPTARG};;
 p) PHYLO=${OPTARG};;
+P) DO_PLOTS=${OPTARG};;
 
 esac
 done
@@ -77,7 +84,7 @@ CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
  if [[ -f "$CONTIGS" ]]; then
     echo "collated contigs exist for ${i}. Skipping."
  else
- echo "collating contigs for ${i}"
+ echo "collating contigs for ${i}."
     while read g; do
         if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
             gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
@@ -86,10 +93,8 @@ CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
     done < ${DIR}/${GENES} > ${CONTIGS}
 
     if [[ ${DEDUPE} == "TRUE" ]]; then
-    echo "Done collating contigs for ${i}. Now deduplicating."
+    echo "Done collating contigs for ${i}. Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus!"
       dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${CONTIGS}.dedupe.log
-      # rm ${CONTIGS}
-      # mv ${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta ${CONTIGS}
     fi
  fi
 done < ${DIR}/${SAMPLES}
@@ -124,24 +129,24 @@ while read i;do
  if [[ -f "$COVSTATS" ]]; then
     echo "VetTargets_genome output exists for ${i}. Skipping."
  else
-    echo "running VetTargets_genome on ${i}"
+    echo "running VetTargets_genome on ${i}."
     BL=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
     BLH=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
     echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
         cat - ${BL} > ${BLH}
     
     Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
-    --output_prefix ${i} \
-    --min_fragment_length ${LENGTH} \
-    --min_pident ${PIDENT} \
-    --max_intron_length 10000 \
-    --max_intron_percent 1 \
-    --min_display_intron 1 \
-    --doPlots FALSE \
-    --doIntronStats ${DO_INTRON} \
-    --doCovPerChrom ${DO_PER_CHROM} \
-    --multicopyTarget ${MULTI} \
-    --genelist ${DIR}/${GENES}
+      --output_prefix ${i} \
+      --min_fragment_length ${LENGTH} \
+      --min_pident ${PIDENT} \
+      --max_intron_length 10000 \
+      --max_intron_percent 1 \
+      --min_display_intron 10 \
+      --doPlots ${DO_PLOTS} \
+      --doIntronStats ${DO_INTRON} \
+      --doCovPerChrom ${DO_PER_CHROM} \
+      --multicopyTarget ${MULTI} \
+      --genelist ${DIR}/${GENES}
  fi
 done < ${DIR}/${SAMPLES}
 
@@ -161,9 +166,9 @@ fi
 echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
-      echo "working on $TSN"
+      echo "working on $TSN."
       Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/VetTargets_genome_output/${TSN}/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
-      echo "finished $TSN"
+      echo "finished $TSN."
   done < targetsourcenames.txt
 else
    Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}

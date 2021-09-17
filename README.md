@@ -1,48 +1,72 @@
 # TL;DR
 TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads, a reference genome, or assembled contigs from target capture sequence data, to:
- 1. Identify putative **paralogs** and **missing genes** using either
-    a. WGS raw reads from one or more related species: `VetTargets_WGS.R`
-    b. Genome assemblies (draft or reference):`VetTargets_genome.R`
+ 1. Identify putative **paralogs** and **missing genes** using:
+
+    a. WGS raw reads from one or more related species: `VetTargets_WGS.R`,
+
+    b. Genome assemblies (draft or reference): `VetTargets_genome.R`, or
+
     c. Target Capture data assembled using HybPiper: `VetHybPiper.sh`.
  2. Nicely visualise the **genomic context** of your targets relative to your study group.
- 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should definitely NOT be assumed to be in linkage equilibrium). (Only `VetTargets_genome.R`).
- 4. Extract supercontigs to use as targets for phylogenetics in closely related species (or population genomics). (`TargetSupercontigs.R`).
+ 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should definitely NOT be assumed to be in linkage equilibrium): Only `VetTargets_genome.R`.
+ 4. Extract supercontigs to use as targets for phylogenetics in closely related species (or population genomics): `TargetSupercontigs.R`.
 
-Currently the scripts run on the command line via Rscript. Dependencies:
+# Dependencies
+The R scripts run on the command line via `Rscript`. The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for any UNIX-like OS.
+
+Dependencies:
 ```
 R (https://cran.r-project.org/)
 R packages:
+    progress
     optparse
     tidyverse
     ggrepel
     segmented
+    gplots
+    dendextend
     Biostrings
     Rsamtools
 
+##  To install these, run:
+    install.packages(c("tidyverse","ggrepel","optparse","progress","segmented","gplots","dendextend"))
+    if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
+    BiocManager::install("Biostrings")
+    BiocManager::install("Rsamtools")
 
-To install these, run
-install.packages(c("tidyverse","ggrepel","optparse","segmented"))
-if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
-BiocManager::install("Biostrings")
-BiocManager::install("Rsamtools")
+Optional:
+BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+BBMap suite (https://sourceforge.net/projects/bbmap/)
 ```
 
-# **`VetTargets_WGS.R`** and **`VetTargets_genome.R`**
+# Identify paralogs from HybPiper: **`VetHybPiper.sh`**
+This script is designed as an easy-to-use wrapper around several TargetVet scripts with the aim of automated identification of paralogs in `HybPiper`-assembled target capture data. It also produces detailed summary tables (so you can apply your own filtering and paralog-detection methods), as well as nice figures that help you visualise patterns of paralogy and missingness in your assemblies, across all genes and samples.
 
-You're doing a phylogenomics using target capture and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many nasty paralogs or other surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
+The script runs using Bash, the standard shell-scripting language on Linux systems. You can see the available options by running `bash VetHybPiper.sh -h`. The 6 minimum required arguments are all things (mostly files) that you'll already have in your HybPiper directory, so you won't have to do anything new before running this. 
+
+You will need to have the BLAST+ bin in your path.
+
+Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I added this in because I have found that `HybPiper` contigs often contain two (or more) **near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores**. I suspect that this is because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and that it is therefore assembling each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
+
+What does `VetHybPiper.sh` do? This:
+1. For each sample, fetch all the assembled contigs from the HybPiper output directory and collate them into a single all-target fasta.
+2. For each sample, nucleotide BLAST the contigs to the target fasta (the one you used as the reference for HybPiper).
+3. For each sample, run `VetTargets_genome.R` to calculate paralogy indices and more (see below). By default the script's plotting functionality if turned off as it can take a long time and is in this context not likely to be interesting. It can however be switched on using `-P TRUE`.
+4. Across the sample set, run `DetectParalogs.R` on the previous step's output. If the reference fasta contains multiple copies of each target (in which case you need to specify `-M TRUE`), this will be done separately for each target source, with results output in separate folders named after each.
+
+## How does `DetectParalogs.R` detect paralogs?
+It's a secret.
+
+# Designing a project:  **`VetTargets_genome.R`** and **`VetTargets_WGS.R`**
+
+You're designing a target capture phylogenomics project and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many paralogs or other nasty surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
 
 TargetVet provides methods for using WGS data and/or a reference genome to vet (i.e. filter) your target set before bait design. 
 
-In the event that you're already with target capture data in hand, you can still use TargetVet to help filter your assembled genes (e.g. to identify paralogs and guide their separate assembly).
+In the event that you're already with target capture data in hand, you can still use TargetVet to help filter your assembled genes (e.g. to identify paralogs and guide their separate assembly). See the previous section.
 
 ## Usage
-#### `VetTargets_genome.R`
-This takes a blast search of your targets to your genome and outputs the following:
-1. `<output_prefix>.IntronFlags.txt`: Per-target summary of introns/intergenic regions with logical flags for exceeding specified max intron length and percent of supercontig made up of introns, as well as the actual values.
-2. `<output_prefix>.IntronStats.txt`: Position and length of each intron on each target.
-3. `<output_prefix>.CoverageStats_AcrossChromosomes.txt`: Per-target summary of coverage across 'chromosomes' in the reference genome. Fields are `qseqid mean_paralogy_rate paralog_percent full_percent unique_percent missing_percent n_chroms`. This is informative about **paralogs**. You will be most interested in `mean_paralogy_rate`, which is the average number of segments from the genome covering each position in the target. Single-copy loci will have a value around 1, duplicates around 2, triplicates around 3, etc. This value considers the full target length, so the minumim value is 0. To check for **missing** targets, look at `missing_percent`, which is the proportion of the target without any matches (i.e. with coverage 0). Remember that if you set `--min_fragment_length` too high, `missing_percent` will be inflated. Keeping it at zero should be fine.
-4. `<output_prefix>.CoverageStats_PerChromosome.txt`: this has the same fields as the across-chromosomes summary, but the values are reported for every target-chromosome matched pair. If the target only matches to one chromosome, it will have a single row with values identical to those in the across-chromosomes summary.
-
+### `VetTargets_genome.R`
 ```
 # to get a description of the available arguments (several are required)
 Rscript VetTargets_genome.R -h
@@ -50,7 +74,7 @@ Rscript VetTargets_genome.R -h
 # example run
 Rscript VetTargets_genome.R --blast_file blastn_yourtargets_to_yourgenome.withHeader.txt --min_fragment_length 0 --min_pident 70 --max_intron_length 1000 --max_intron_percent 50 --output_prefix targets2genome --min_display_intron 300
 ```
-**NB:** The blast file must contain the following (tab-separated) fields, and have them as its header:
+**NB:** The blast file must contain the following (tab-separated) fields, and have them as its first line:
 ```
 qseqid	sseqid	pident	length	mismatch	gapopen	qlen	qstart	qend	slen	sstart	send	evalue	bitscore
 ```
@@ -62,10 +86,20 @@ blastn -query yourtargets.fasta -db yourgenome_db -outfmt "6 qseqid sseqid piden
 ```
 Then just paste in the header line above.
 
+### Running the script will generate the following files:
+
+1. `<output_prefix>.IntronFlags.txt`: Per-target summary of introns/intergenic regions with logical flags for exceeding specified max intron length and percent of supercontig made up of introns, as well as the actual values.
+   
+2. `<output_prefix>.IntronStats.txt`: Position and length of each intron on each target.
+   
+3. `<output_prefix>.CoverageStats_AcrossChromosomes.txt`: Per-target summary of coverage across 'chromosomes' in the reference genome. Fields are `qseqid mean_paralogy_rate paralog_percent full_percent unique_percent missing_percent n_chroms`. This is informative about **paralogs**. You will be most interested in `mean_paralogy_rate`, which is the average number of segments from the genome covering each position in the target. Single-copy loci will have a value around 1, duplicates around 2, triplicates around 3, etc. This value considers the full target length, so the minumim value is 0. To check for **missing** targets, look at `missing_percent`, which is the proportion of the target without any matches (i.e. with coverage 0). Remember that if you set `--min_fragment_length` too high, `missing_percent` will be inflated. Keeping it at zero should be fine.
+   
+4. `<output_prefix>.CoverageStats_PerChromosome.txt`: this has the same fields as the across-chromosomes summary, but the values are reported for every target-chromosome matched pair. If the target only matches to one chromosome, it will have a single row with values identical to those in the across-chromosomes summary.
+
 # **`TargetSupercontigs.R`**
 Extract supercontigs from (draft) genome assemblies for more effective target capture sequencing in **closely related species**.
 
-### Rationale
+## Rationale
 Phylogenomic projects in non-model organisms typically use exons as their targets, often even if their study group consists of very recently diverged, and therefore phylogenetically difficult, taxa. This results in significantly reduced coverage and poor assembly of intronic or flanking regions, which are consistently shown to improve phylogenetic inference due to their faster mutation rates.
 
 At the same time, whole-genome shotgun sequencing is now relatively cheap, making draft genome assembly possible for us poor phylogeneticists working on non-model organisms.
@@ -75,7 +109,7 @@ At the same time, whole-genome shotgun sequencing is now relatively cheap, makin
 ## Usage
 ```
 # to get usage and help
-Rscript TargetSupercontigs.R
+Rscript TargetSupercontigs.R -h
 # basic run with default parameters and blacklist from VetTargets_WGS.R
 Rscript TargetSupercontigs.R -b blastn_yourtargets_to_yourgenome.withHeader.txt -g yourgenome.fasta -o test1 -x test1.removed 
 ```
@@ -87,5 +121,3 @@ Rscript TargetSupercontigs.R -b blastn_yourtargets_to_yourgenome.withHeader.txt 
 ## Notes to self
 ##### TODO:
 Make script to group exons from the same gene into separate target loci when introns are super big. (?)
-##### DONE 
-Make sure to flag as paralogs regions on the same chromosome matching the same target.

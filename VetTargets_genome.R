@@ -16,6 +16,11 @@
 ## not yet implemented
 ###  --max_intron_percent < maximum allowable percentage of a supercontig's length consisting of introns >
 
+
+## TO DO
+# 1. Properly treat tblastx result
+# 2. differentiate containment and redundancy, and add length-prioritisation if bitscore and pident are equivalent
+
 GetCoverageStats<-function(data,doCovPerChrom=TRUE){
   coverage_summary_chromosome_aware<-data.frame()
   coverage_summary_chromosome_UNaware<-data.frame()
@@ -91,7 +96,7 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
   }
 }
 
-FindIntrons<-function(data,max_intron_length,max_intron_percent){
+FindIntrons<-function(data,max_intron_length=10000,max_intron_percent=100){
   introns_out<-data.frame()
   introns_flag_out<-data.frame()
   for(i in unique(data$qseqid)){
@@ -136,9 +141,13 @@ FindIntrons<-function(data,max_intron_length,max_intron_percent){
 
 PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
   pdf(paste0(output_prefix,"_plots.pdf"),width=15)
-  cat("Making synteny plots. It's kinda hard work. Please bear with me :)\n")
+  cat("Making synteny plots. It's kinda hard work. Please bear with me ^_^ \n")
+  pb <- progress_bar$new(total = length(unique(data$qseqid)),
+                         clear=F,
+                         format = "[:bar] :percent; elapsed :elapsed")
   for(i in unique(data$qseqid)){
-    cat("Plotting",i,"\n")
+    pb$tick()
+    # cat("Plotting",i,"\n")
     temp<-data %>% 
       filter(qseqid==i)
     # don't plot if it won't fit in the plot area
@@ -157,7 +166,7 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
         na.exclude()
       
       p<-ggplot(temp)+
-        geom_segment(aes(y=sstart,yend=send,x=qstart,xend=qend,colour=bitscore),
+        geom_segment(aes(y=sstart,yend=send,x=qstart,xend=qend,colour=pident),
                      show.legend = T,size=2.5)+
         scale_colour_viridis_c("Sequence\nsimilarity")+
         facet_wrap(~sseqid,scales = "free")+
@@ -181,14 +190,56 @@ PlotTargets<-function(data,output_prefix,min_display_intron,max_display_intron){
                            label.r=0.01,seed=1234,
                            max.overlaps=15)
       }
-      print(p)
+      suppressWarnings(print(p))
     }else{
       p<-ggplot()+ggtitle(paste0(i,": Too many matches to fit in plot area!"))
-      print(p)
+      suppressWarnings(print(p))
     }
   }
   dev.off()
+}
+
+enumerate<-function(x){seq(min(x),max(x),by=1)}
+full_enumeration<-function(x,a,b){do.call(c,sapply(1:nrow(x),function(k){enumerate(x[k,c(a,b)])},simplify = F))}
+full_containment<-function(x,a,b){mean(table(full_enumeration(x,a,b)))}
+
+ThinBlastResult<-function(data){
+  dat<-data
+  dat$pair<-paste0(dat$qseqid,"_",dat$sseqid)
+  new.dat<-data.frame()
   
+  pb <- progress_bar$new(total = length(unique(dat$pair)),
+                         clear=F,
+                         format = "[:bar] :percent; elapsed :elapsed")
+  
+  for(i in unique(dat$pair)){
+    pb$tick()
+    dat.thin<-dat[dat$pair==i,] %>% arrange(desc(length))
+    dat.thin.containment<-full_containment(dat.thin,"qstart","qend")
+    if(nrow(dat.thin)>1 & dat.thin.containment>=1.1){
+      kombis<-data.frame(t(combn(1:nrow(dat.thin),m=2)))
+      kombis$containment<-sapply(1:nrow(kombis),function(g) full_containment(dat.thin[c(kombis[g,1],kombis[g,2]),],"qstart","qend"))
+      if(any(kombis$containment>=1.1)){
+        kombis.todo<-kombis[kombis$containment>=1.1,]
+        kombis.todo$worstscoring_index<-NA
+        for(g in 1:nrow(kombis.todo)){
+          my_pair<-c(kombis.todo[g,1],kombis.todo[g,2])
+          # containment<-full_containment(dat.thin[my_pair,],"qstart","qend")
+          kombis.todo[g,]$worstscoring_index<-ifelse(nrow(unique(dat.thin[my_pair,"bitscore"]))==2,
+                                                     yes=which(dat.thin[my_pair,"bitscore"]==min(dat.thin[my_pair,"bitscore"])),
+                                                     no=ifelse(nrow(unique(dat.thin[my_pair,"pident"]))==2,
+                                                               which(dat.thin[my_pair,"pident"]==min(dat.thin[my_pair,"pident"])),
+                                                               which(dat.thin[my_pair,"length"]==max(dat.thin[my_pair,"length"]))[1])
+          )## if scores are different, choose best, otherwise (very unlikely) choose best pident
+        }
+        kombis.todo$worstscoring<-sapply(1:nrow(kombis.todo),function(x) {kombis.todo[x,kombis.todo[x,"worstscoring_index"]]},simplify = "array")
+        dat.thin<-dat.thin[-unique(as.numeric(kombis.todo$worstscoring)),]
+        # dat.thin.containment<-full_containment(dat.thin,"qstart","qend")
+      }
+      new.dat<-rbind(new.dat,dat.thin)
+    }
+  }
+  return(new.dat)
 }
 
 CheckTargets<-function(blast_file,
@@ -208,25 +259,40 @@ CheckTargets<-function(blast_file,
   # suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
+  suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
   dat <- as_tibble(read.table(blast_file,header=T))
+  cat("BLAST result has",nrow(dat),"rows.\n")
   dat <- dat %>%
     filter(pident >= min_pident,
            length >= min_fragment_length)
+  cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
+  if(!file.exists(paste0(output_prefix,"thinned_blast_result.txt"))){
+    cat("Now removing redundant BLAST hits.\n")
+    dat <- ThinBlastResult(dat)
+    write.table(dat,file = paste0(output_prefix,"thinned_blast_result.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+    cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
+  } else{
+    cat("thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
+    dat<-as_tibble(read.table(paste0(output_prefix,"thinned_blast_result.txt"),header = T))
+  }
+
   if(!is.null(genelist)){
     gl <- scan(genelist,what="character")
   }
-  ## for cases where we have multiple copies of each gene in the target file, split the blast results by copy source and run analyses separately on each.
+  ## for cases where we have multiple copies of each gene in the target file, 
+  # split the blast results by copy source and run analyses separately on each.
   if(multicopyTarget){
     dat <- dat %>% separate(col = qseqid, into = c("Source","qseqid"), sep = "-")
     sp <- dat$Source
     dat.list <- split(dat, sp)
     output_prefix_OG <- output_prefix
     for (i in names(dat.list)){
+      cat("\nTargets are represented by multiple sources. Now working on targets from", i, "...\n")
       dat <- dat.list[[i]]
       if(!is.null(genelist)){
         dat <- dat[dat$qseqid %in% gl,]
-        if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
+        if(nrow(dat)==0) stop("After filtering out genes not present in the provided gene list, nothing remains! Check the names match.\n")
       }
       ## put results for each copy in separate directory
       if(!dir.exists(i)) {
@@ -243,7 +309,7 @@ CheckTargets<-function(blast_file,
         write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
         
         if(doIntronStats){
-          intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
+          intron_stats<-suppressWarnings(FindIntrons(data=dat,max_intron_length,max_intron_percent))
           write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
           write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
         }
@@ -258,14 +324,14 @@ CheckTargets<-function(blast_file,
   } else {
     if(!is.null(genelist)){
       dat <- dat[dat$qseqid %in% gl,]
-      if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check the names match.\n")
+      if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check that the names match.\n")
     }
     cov_stats<-GetCoverageStats(dat,doCovPerChrom)
     if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" ) }
     write.table(cov_stats$coverage_summary_chromosome_unaware,paste0(output_prefix,"_CoverageStats_AcrossChromosomes.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
     
     if(doIntronStats){
-      intron_stats<-FindIntrons(data=dat,max_intron_length,max_intron_percent)
+      intron_stats<-suppressWarnings(FindIntrons(data=dat,max_intron_length,max_intron_percent))
       write.table(intron_stats$intron_details,paste0(output_prefix,"_IntronStats.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
       write.table(intron_stats$targets_with_intron_flags,paste0(output_prefix,"_IntronFlags.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
     }
@@ -280,8 +346,7 @@ CheckTargets<-function(blast_file,
 #### DONE DEFINING FUNCTIONS
 suppressMessages(suppressWarnings(require(optparse)))
 
-p <- OptionParser(usage="This script will take a tabular blast result (-outfmt 6) with your target exons as the query and (draft) genome as the subject\n
-   ***WITH A HEADER LINE**\n
+p <- OptionParser(usage="This script will take a tabular blast result (-outfmt 6) **WITH A HEADER LINE** with your target fasta as the query and (draft) genome as the subject\n
   and do the following:\n
    1. Find potential paralogs by identifying genes with good matches from more than one contig/chromosome segments in the reference genome\n
    2. Find potentially missing genes by identifying genes with no or few good matches in the reference genome\n
@@ -290,40 +355,44 @@ p <- OptionParser(usage="This script will take a tabular blast result (-outfmt 6
    4. if --doPlots=TRUE, create sets of simple segment plots to allow for visual inspection of blast alignments of genes failing and passing the above checks\n
    5. Output files listing names of targets passing or failing each check, and a file of 'clean' targets passing all checks\n
   Run using Rscript, e.g.\n
-  Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --min_fragment_length 50 --min_pident 80 --max_intron_length 10000 --max_intron_percent 60 --output_prefix test")
+  Rscript VetTargets_genome.R --blast_file blastn_targets_to_genome.txt --min_fragment_length 50 --min_pident 80 --max_intron_length 10000 --max_intron_percent 60 --output_prefix test\n")
 # Add a positional argument
-p <- add_option(p, c("--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject>",type="character")
-p <- add_option(p, c("--min_fragment_length"), help="<Required: minimum length of a blast hit, ignore anything shorter>",type="numeric")
-p <- add_option(p, c("--min_pident"), help="<Required: minimum % identity of a blast hit, ignore anything lower>",type="numeric")
-p <- add_option(p, c("--max_intron_length"), help="<Required: length threshold of the largest intron in a gene; flag any gene exceeding>",type="numeric")
-p <- add_option(p, c("--max_intron_percent"), help="<Required: percentage of a supercontig's length consisting of introns; flag any gene exceeding>",type="numeric")
-p <- add_option(p, c("--output_prefix"), help="<prefix to name results files; defaults to VetTargets_genome_results>",type="character",default = "VetTargets_genome_results")
-p <- add_option(p, c("--min_display_intron"), help="<intron length above which to annotate on plots; default 1kb>",type="numeric",default=1000)
-p <- add_option(p, c("--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
-p <- add_option(p, c("--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
-p <- add_option(p, c("--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
-p <- add_option(p, c("--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
-p <- add_option(p, c("--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=TRUE>",type="logical",default=FALSE)
-p <- add_option(p, c("--genelist"), help="<file listing genes to process>",type="character",default=NULL)
+# Required
+p <- add_option(p, c("-b","--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject>",type="character")
+p <- add_option(p, c("-f","--min_fragment_length"), help="<Required: minimum length of a blast hit, ignore anything shorter>",type="numeric")
+p <- add_option(p, c("-p","--min_pident"), help="<Required: minimum % identity of a blast hit, ignore anything lower>",type="numeric")
+p <- add_option(p, c("-i","--max_intron_length"), help="<Required: length threshold of the largest intron in a gene; flag any gene exceeding>",type="numeric")
+p <- add_option(p, c("-I","--max_intron_percent"), help="<Required: percentage of a supercontig's length consisting of introns; flag any gene exceeding>",type="numeric")
+# Optional
+p <- add_option(p, c("-o","--output_prefix"), help="<prefix to name results files; defaults to VetTargets_genome_results>",type="character",default = "VetTargets_genome_results")
+p <- add_option(p, c("-d","--min_display_intron"), help="<intron length above which to annotate on plots; default 1kb>",type="numeric",default=1000)
+p <- add_option(p, c("-D","--max_display_intron"), help="<don't annotate introns longer than this; default 1Mb>",type="numeric",default=1e6)
+p <- add_option(p, c("-P","--doPlots"), help="<Make plots? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("-S","--doIntronStats"), help="<Calculate intron stats? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("-C","--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
+p <- add_option(p, c("-M","--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=FALSE>",type="logical",default=FALSE)
+p <- add_option(p, c("-g","--genelist"), help="<file listing genes to process, excluding any others>",type="character",default=NULL)
 
 # parse
 args<-parse_args(p)
+# print(args)
+if(is.null(args$blast_file)){ 
+  print_help(p)
+  }else{
+  ## RUN
+  try(CheckTargets(blast_file = args$blast_file,
+                   min_pident = args$min_pident,
+                   min_fragment_length = args$min_fragment_length,
+                   max_intron_length = args$max_intron_length,
+                   max_intron_percent = args$max_intron_percent,
+                   output_prefix = args$output_prefix,
+                   min_display_intron = args$min_display_intron,
+                   max_display_intron = args$max_display_intron,
+                   doPlots = args$doPlots,
+                   doIntronStats = args$doIntronStats,
+                   doCovPerChrom = args$doCovPerChrom,
+                   multicopyTarget = args$multicopyTarget,
+                   genelist = args$genelist))
+  cat("VetTargets_genome.R is done!\n")
+}
 
-## RUN
-CheckTargets(blast_file = args$blast_file,
-             min_pident = args$min_pident,
-             min_fragment_length = args$min_fragment_length,
-             max_intron_length = args$max_intron_length,
-             max_intron_percent = args$max_intron_percent,
-             output_prefix = args$output_prefix,
-             min_display_intron = args$min_display_intron,
-             max_display_intron = args$max_display_intron,
-             doPlots = args$doPlots,
-             doIntronStats = args$doIntronStats,
-             doCovPerChrom = args$doCovPerChrom,
-             multicopyTarget = args$multicopyTarget,
-             genelist = args$genelist)
-
-
-
-             
