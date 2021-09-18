@@ -322,6 +322,8 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
                     .groups="keep")
         write.table(out_meanSort_summary_ingroup,paste0(outdir,"/paralogy_summary_ingroup.txt"),
                     quote=F,row.names=F,sep="\t")
+        cat("Using ingroup samples -- Identified",sum(out_meanSort_summary_ingroup$diagnosis=="Paralog"),"paralogs!\n")
+
         out_meanSort_summary_ingroup %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
         write.table(paste0(outdir,"/paralog_list_ingroup.txt"),
                     quote=F,row.names=F,col.names=F,sep="\t")
@@ -346,6 +348,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
                     .groups="keep")
     write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary.txt"),
                 quote=F,row.names=F,sep="\t")
+    cat("Using all samples -- Identified",sum(out_meanSort_summary$diagnosis=="Paralog"),"paralogs!\n")
     
     out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
         write.table(paste0(outdir,"/paralog_list.txt"),
