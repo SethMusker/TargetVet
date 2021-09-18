@@ -43,6 +43,8 @@ PIDENT=70
 FORCE=TRUE
 DO_PLOTS=FALSE
 BLAST_TYPE=blastn
+PHYLO=NULL
+INGROUP=NULL
 ## parse args
 while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B: option
 do
@@ -181,11 +183,11 @@ echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
       echo "working on $TSN."
-      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/VetTargets_genome_output/${TSN}/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
+      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/DetectParalogs_output/${TSN} -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
       echo "finished $TSN."
   done < targetsourcenames.txt
 else
-   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/VetTargets_genome_output/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
+   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
 fi
 
 echo "All done."
