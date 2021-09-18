@@ -1,5 +1,5 @@
 # TL;DR
-TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads, a reference genome, or assembled contigs from target capture sequence data, to:
+TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads, a reference genome, or assembled contigs from target capture sequence data (such as those made by `HybPiper` - https://github.com/mossmatters/HybPiper), to:
  1. Identify putative **paralogs** and **missing genes** using:
 
     a. WGS raw reads from one or more related species: `VetTargets_WGS.R`,
