@@ -183,11 +183,11 @@ echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
       echo "working on $TSN."
-      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/DetectParalogs_output/${TSN} -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
+      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/DetectParalogs_output/${TSN} -f ${FORCE} -i ${DIR}/${INGROUP} -p ${DIR}/${PHYLO}
       echo "finished $TSN."
   done < targetsourcenames.txt
 else
-   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/DetectParalogs_output -f ${FORCE} -i ${INGROUP} -p ${PHYLO}
+   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/DetectParalogs_output -f ${FORCE} -i ${DIR}/${INGROUP} -p ${DIR}/${PHYLO}
 fi
 
 echo "All done."
