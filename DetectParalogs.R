@@ -121,7 +121,10 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     #####################
     ##### PHYLOGENY #####      
     #####################
-    if(!is.null(phylogeny)){
+    if(is.null(phylogeny) | phylogeny=="NULL"){
+        cat("no phylogeny provided. Moving on.\n")
+    }else{
+        cat("Phylogeny", phylogeny,"provided. Will make additional heatmap and a tanglegram.")
         ## load tree and plot
         tree<-read.tree(phylogeny)
         dend_initial<-as.dendrogram(chronos(multi2di(tree)))
@@ -271,7 +274,10 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
 
     
     # Ingroup stuff #
-    if(!is.null(ingroup)){
+    if(is.null(ingroup) | ingroup=="NULL"){
+        cat("no ingroup provided. Moving on.\n")
+        }else{
+        cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
         ingr<-scan(ingroup,what="character")
         out_meanSort_ingroup<-out_meanSort[out_meanSort$Sample %in% ingr,]
         if(nrow(out_meanSort_ingroup) == 0) stop("the names in your ingroup file don't match those in the samples file")
@@ -369,7 +375,7 @@ suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=
 suppressMessages(suppressWarnings(require(gplots,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts=FALSE)))
 
-if(!is.null(args$phylogeny)) suppressMessages(suppressWarnings(require(ape,quietly=TRUE,warn.conflicts=FALSE)))
+if(!is.null(args$phylogeny) & args$phylogeny != "NULL") suppressMessages(suppressWarnings(require(ape,quietly=TRUE,warn.conflicts=FALSE)))
 
 
 try(collate(samples = args$samples,
