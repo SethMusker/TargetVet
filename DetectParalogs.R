@@ -10,7 +10,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         }
     }else{
         cat("Specified output directory exists NOT. Will attempt to create it.\n")
-        dir.create(outdir)
+        dir.create(outdir,recursive=TRUE)
     }
     
     samples<-scan(samples,what="character")
