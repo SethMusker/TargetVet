@@ -254,27 +254,39 @@ CheckTargets<-function(blast_file,
                        doIntronStats,
                        doCovPerChrom,
                        multicopyTarget,
-                       genelist){
+                       genelist,
+                       blast_type){
                          
   # suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
-  dat <- as_tibble(read.table(blast_file,header=T))
-  cat("BLAST result has",nrow(dat),"rows.\n")
-  dat <- dat %>%
-    filter(pident >= min_pident,
-           length >= min_fragment_length)
-  cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
-  if(!file.exists(paste0(output_prefix,"_thinned_blast_result.txt"))){
+  if(!file.exists(paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
+    dat <- as_tibble(read.table(blast_file,header=T))
+    cat("BLAST result has",nrow(dat),"rows.\n")
+    cat("BLAST type specified as",blast_type,".\n")
+    if(blast_type=="tblastx"){
+      cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
+      cat("Will remove hits <",min_fragment_length,"nucleotide base pairs long.\n")
+      dat$length.nuc<-dat$length*3
+    }else{
+      dat$length.nuc<-dat$length
+    }
+    dat <- dat %>%
+      filter(pident >= min_pident,
+             length.nuc >= min_fragment_length)
+    cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
     cat("Now removing redundant BLAST hits.\n")
     dat <- ThinBlastResult(dat)
-    write.table(dat,file = paste0(output_prefix,"_thinned_blast_result.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+    
+    write.table(dat,file = paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
     cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
+    cat("This thinned blast result was written to",paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
   } else{
-    cat("thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
-    dat<-as_tibble(read.table(paste0(output_prefix,"_thinned_blast_result.txt"),header = T))
+    cat("Thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
+    cat("Reading in",paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
+    dat<-as_tibble(read.table(paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),header = T))
   }
 
   if(!is.null(genelist)){
@@ -324,7 +336,7 @@ CheckTargets<-function(blast_file,
   } else {
     if(!is.null(genelist)){
       dat <- dat[dat$qseqid %in% gl,]
-      if(nrow(dat)==0) stop("after filtering out genes not in the provided gene file, nothing remains! Check that the names match.\n")
+      if(nrow(dat)==0) stop("After filtering out genes not in the provided gene file, nothing remains! Check that the names match.\n")
     }
     cov_stats<-GetCoverageStats(dat,doCovPerChrom)
     if(doCovPerChrom){ write.table(cov_stats$coverage_summary_chromosome_aware,paste0(output_prefix,"_CoverageStats_PerChromosome.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" ) }
@@ -372,6 +384,7 @@ p <- add_option(p, c("-S","--doIntronStats"), help="<Calculate intron stats? Def
 p <- add_option(p, c("-C","--doCovPerChrom"), help="<Calculate per-chromosome coverage stats (in addition to across-chromosome)? Default=TRUE>",type="logical",default=TRUE)
 p <- add_option(p, c("-M","--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-g","--genelist"), help="<file listing genes to process, excluding any others>",type="character",default=NULL)
+p <- add_option(p, c("-B","--blast_type"), help="<blastn or tblastx? Default=blastn>",type="character",default="blastn")
 
 # parse
 args<-parse_args(p)
@@ -392,7 +405,8 @@ if(is.null(args$blast_file)){
                    doIntronStats = args$doIntronStats,
                    doCovPerChrom = args$doCovPerChrom,
                    multicopyTarget = args$multicopyTarget,
-                   genelist = args$genelist))
+                   genelist = args$genelist,
+                   blast_type = args$blast_type))
   cat("VetTargets_genome.R is done!\n")
 }
 

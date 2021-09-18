@@ -163,7 +163,8 @@ COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_thinned_blast_result.txt
       --doIntronStats ${DO_INTRON} \
       --doCovPerChrom ${DO_PER_CHROM} \
       --multicopyTarget ${MULTI} \
-      --genelist ${DIR}/${GENES}
+      --genelist ${DIR}/${GENES} \
+      --blast_type ${BLAST_TYPE}
  fi
 done < ${DIR}/${SAMPLES}
 
