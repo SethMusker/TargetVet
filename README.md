@@ -8,11 +8,11 @@ TargetVet is an R-based CLI for evolutionary studies (especially phylogenomics) 
 
     c. Target Capture data assembled using HybPiper: `VetHybPiper.sh`.
  2. Nicely visualise the **genomic context** of your targets relative to your study group.
- 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should definitely NOT be assumed to be in linkage equilibrium): Only `VetTargets_genome.R`.
+ 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should not be assumed to be in linkage equilibrium): Only `VetTargets_genome.R`.
  4. Extract supercontigs to use as targets for phylogenetics in closely related species (or population genomics): `TargetSupercontigs.R`.
 
 # Dependencies
-The R scripts run on the command line via `Rscript` (see examples below). The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for any UNIX-like OS.
+The R scripts run on the command line via `Rscript` (see examples below) and are therefore platform-independent. The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for linux.
 
 Dependencies:
 ```
@@ -36,8 +36,8 @@ R packages:
     BiocManager::install("Rsamtools")
 
 Optional:
-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
-BBMap suite (https://sourceforge.net/projects/bbmap/)
+BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) # if you plan to run VetHybPiper.sh
+BBMap suite (https://sourceforge.net/projects/bbmap/) #  optional but recommended for VetHybPiper.sh
 ```
 
 # Identify paralogs from HybPiper: **`VetHybPiper.sh`**
@@ -47,7 +47,9 @@ The script runs using Bash, the standard shell-scripting language on Linux syste
 
 You will need to have the BLAST+ bin in your path.
 
-Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I added this in because I have found that `HybPiper` contigs often contain two (or more) **near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores**. I suspect that this is because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and that it is therefore assembling each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
+Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I have found that `HybPiper` contigs often contain two (or more) **near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores**. This is possibly because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and it is therefore assembling each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
+
+By default `blastn` is used, but if your targets are quite divergent from your samples you may wish to use `tblastx` for more sensitive querying (set `-B tblastx`). However, note that because of the evaluation of all possible reading frames, this option produces many more redundant hits (i.e. within-contig matches to essentially the same part of the target) than `blastn`. I have implemented an effective 'thinning' algorithm in `VetTargets_genome.R` for removing these redundancies, but it can add a bit of time to the overall analysis (around 1 to 2 minutes per sample).
 
 ## What does `VetHybPiper.sh` do?
 1. For each sample, fetch all the assembled contigs from the HybPiper output directory and collate them into a single all-target fasta.
