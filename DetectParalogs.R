@@ -173,7 +173,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
         ggplot()+
         geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
-        scale_fill_viridis_c("Missingness (%)",option="D")+
+        scale_fill_viridis_c("Missingness (%)",option="magma",direction=-1)+
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/missingness_heatmap.pdf"),width=28,height=20,units="cm")
@@ -197,7 +197,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
 
     pdf(paste0(outdir,"/missingness_heatmap2_clustered.pdf"),width=40,height=20)
     heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
-              col = c(viridisLite::viridis(100)),
+              col = rev(c(viridisLite::magma(100))),
               Rowv = Rowv, Colv = Colv, 
               cexRow = 1 + 1/log10(nrow(out_mat_mat)),
               cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
@@ -220,7 +220,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Missingness(%)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("All target loci")
-    ggsave(paste0(outdir,"/missing_percent_perSample.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/missing_percent_perSample_boxplot.pdf"),width=30,units = "cm")
 
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -230,7 +230,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Missingness(%)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(outdir,"/missing_percent_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/missing_percent_perSample_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
 
     # Plot paralogy
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
@@ -240,7 +240,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Observed Paralog Rate (ignoring missing segments)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("All target loci")
-    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample_boxplot.pdf"),width=30,units = "cm")
 
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -250,7 +250,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Observed Paralog Rate (ignoring missing segments)",x="Sample (arranged by RSS relative to breakpoint regression)")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_perSample_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
 
     # Plot residuals
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
@@ -260,7 +260,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Obs - Exp Paralog Rate for breakpoint regression with 1 inflection point")+
         ggtitle("All target loci")
-    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint_RESIDUALS_boxplot.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint_residuals_boxplot.pdf"),width=30,units = "cm")
     
     out_meanSort %>% mutate(Sample=fct_reorder(Sample,resid_sq,mean)) %>% 
         filter(orderMean<=seg.mean$psi[2]) %>%
@@ -270,7 +270,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
         labs(y="Obs - Exp Paralog Rate for breakpoint regression with 1 inflection point")+
         ggtitle("Putative paralogs removed")
-    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint_RESIDUALS_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
+    ggsave(paste0(outdir,"/paralog_percent_ignoreMissing_breakpoint_residuals_boxplot_paralogsRemoved.pdf"),width=30,units = "cm")
 
     
     # Ingroup stuff #
