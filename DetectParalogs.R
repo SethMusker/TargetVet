@@ -173,7 +173,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
         ggplot()+
         geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
-        scale_fill_viridis_c("Missingness (%)",option="magma",direction=-1)+
+        scale_fill_viridis_c("Missingness (%)",option="magma",direction=1)+
         labs(x="Target")+
         theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
     ggsave(paste0(outdir,"/missingness_heatmap.pdf"),width=28,height=20,units="cm")
@@ -197,7 +197,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
 
     pdf(paste0(outdir,"/missingness_heatmap2_clustered.pdf"),width=40,height=20)
     heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
-              col = rev(c(viridisLite::magma(100))),
+              col = c(viridisLite::magma(100)),
               Rowv = Rowv, Colv = Colv, 
               cexRow = 1 + 1/log10(nrow(out_mat_mat)),
               cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
