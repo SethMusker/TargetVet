@@ -121,7 +121,7 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
     #####################
     ##### PHYLOGENY #####      
     #####################
-    if(is.null(phylogeny) | phylogeny=="NULL"){
+    if(is.null(phylogeny) | basename(phylogeny)=="NULL"){
         cat("no phylogeny provided. Moving on.\n")
     }else{
         cat("Phylogeny", phylogeny,"provided. Will make additional heatmap and a tanglegram.")
@@ -274,8 +274,8 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
 
     
     # Ingroup stuff #
-    if(is.null(ingroup) | ingroup=="NULL"){
-        cat("no ingroup provided. Moving on.\n")
+    if(is.null(ingroup) | basename(ingroup)=="NULL"){
+        cat("No ingroup provided. Moving on.\n")
         }else{
         cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
         ingr<-scan(ingroup,what="character")

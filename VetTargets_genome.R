@@ -267,14 +267,14 @@ CheckTargets<-function(blast_file,
     filter(pident >= min_pident,
            length >= min_fragment_length)
   cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
-  if(!file.exists(paste0(output_prefix,"thinned_blast_result.txt"))){
+  if(!file.exists(paste0(output_prefix,"_thinned_blast_result.txt"))){
     cat("Now removing redundant BLAST hits.\n")
     dat <- ThinBlastResult(dat)
-    write.table(dat,file = paste0(output_prefix,"thinned_blast_result.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+    write.table(dat,file = paste0(output_prefix,"_thinned_blast_result.txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
     cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
   } else{
     cat("thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
-    dat<-as_tibble(read.table(paste0(output_prefix,"thinned_blast_result.txt"),header = T))
+    dat<-as_tibble(read.table(paste0(output_prefix,"_thinned_blast_result.txt"),header = T))
   }
 
   if(!is.null(genelist)){

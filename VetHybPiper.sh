@@ -108,7 +108,7 @@ done < ${DIR}/${SAMPLES}
 # 2. blast to TARGETS
 mkdir -p ${OUTDIR}/blast_out
 while read i;do
- BLASTOUT=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+ BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
  if [[ -f "$BLASTOUT" ]]; then
     echo "blast output exists for ${i}. Skipping."
  else   
@@ -142,12 +142,13 @@ cd ${OUTDIR}/VetTargets_genome_output
 
 
 while read i;do
+COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_thinned_blast_result.txt
  if [[ -f "$COVSTATS" ]]; then
     echo "VetTargets_genome output exists for ${i}. Skipping."
  else
     echo "running VetTargets_genome on ${i}."
-    BL=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
-    BLH=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
+    BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+    BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
     echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
         cat - ${BL} > ${BLH}
     
@@ -175,7 +176,7 @@ done < ${DIR}/${SAMPLES}
 if [[ ${MULTI} == "TRUE" ]]; then
    # get prefixes so as to check for pre-existing covstats and run DetectParalogs.R on each separately
    i=`head -n1 ${DIR}/${SAMPLES}`
-   BL=${OUTDIR}/blast_out/blastn_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+   BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
    cut -d'-' -f1 ${BL} | sort | uniq > targetsourcenames.txt
 fi
 
