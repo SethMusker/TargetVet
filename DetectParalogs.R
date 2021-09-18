@@ -279,7 +279,9 @@ collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
         }else{
         cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
         ingr<-scan(ingroup,what="character")
-        out_meanSort_ingroup<-out_meanSort[out_meanSort$Sample %in% ingr,]
+        out_meanSort_ingroup<-out_meanSort[out_meanSort$Sample %in% ingr,] %>%
+            mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) %>%
+            arrange(paralog_percent_ignoreMissing)
         if(nrow(out_meanSort_ingroup) == 0) stop("the names in your ingroup file don't match those in the samples file")
         out_meanSort_ingroup$orderMean<-sapply(out_meanSort_ingroup$qseqid,function(x) {
             y<-which(levels(out_meanSort_ingroup$qseqid)==x)
