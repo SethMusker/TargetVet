@@ -1,5 +1,5 @@
 
-collate<-function(samples,directory,outdir,force,phylogeny,ingroup){
+DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
     
     if(dir.exists(outdir)){
         if(!force){
@@ -383,7 +383,7 @@ suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts
 if(!is.null(args$phylogeny) & args$phylogeny != "NULL") suppressMessages(suppressWarnings(require(ape,quietly=TRUE,warn.conflicts=FALSE)))
 
 
-try(collate(samples = args$samples,
+try(DetectParalogs(samples = args$samples,
         directory = args$directory,
         outdir = args$outdir,
         force = args$force,

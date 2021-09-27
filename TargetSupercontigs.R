@@ -98,12 +98,12 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
         names(chosen_regions_sequences)<-New_names$ID
         # filter out long supercontigs
         if(!keepLongSupercontigs){
-          cat("Removed",sum(width(chosen_regions_sequences)>=max_length),"supercontigs >= max_length:",max_length,"\n")
+          cat("Removing",sum(width(chosen_regions_sequences)>=max_length),"supercontigs >= max_length:",max_length,"\n")
           chosen_regions_sequences<-chosen_regions_sequences[-which(width(chosen_regions_sequences)>=max_length)]
         }else{
           cat("Note: Ignoring max_length and keeping long supercontigs\n")
         }
-        cat("Wrote",length(chosen_regions_sequences),"supercontigs to", paste0(output_prefix,"_TargetSuperContigs.fasta\n"))
+        cat("Writing",length(chosen_regions_sequences),"supercontigs to", paste0(output_prefix,"_TargetSuperContigs.fasta\n"))
         writeXStringSet(chosen_regions_sequences,paste0(output_prefix,"_TargetSuperContigs.fasta"))
         # cat(width(chosen_regions_sequences),"\n")
       }else{
@@ -132,7 +132,7 @@ p <- OptionParser(usage=" This script will take\n
 )
 # Add a positional argument
 p <- add_option(p, c("-b","--blast_file"), help="<Required: tab-delimited blast result, target=query, genome=subject. **With Header!**>",type="character")
-p <- add_option(p, c("-g","--genome"), help="<Required: genome used in blast search>",type="character")
+p <- add_option(p, c("-g","--genome"), help="<Required: genome fasta used in blast search>",type="character")
 p <- add_option(p, c("-o","--output_prefix"), help="<Required: prefix to name results files>",type="character")
 p <- add_option(p, c("-x","--blacklist"), help="<Optional: file listing targets to exclude>",type="character")
 p <- add_option(p, c("--btype"), help="<Optional: what type of blast search? Options are blastn (default) and tblastn>",type="character",default="blastn")
