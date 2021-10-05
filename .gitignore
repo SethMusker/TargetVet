@@ -2,6 +2,6 @@
 testing
 TargetVet_readings/*
 cm
-.tmp.driveupload
-.tmp.drivedownload
-.vscode
+.tmp.driveupload/*
+.tmp.drivedownload/*
+.vscode/*
