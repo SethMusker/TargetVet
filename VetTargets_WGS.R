@@ -1,5 +1,5 @@
 #!/bin/Rscript
-filterTargets<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_median=NULL){
+VetTargets_WGS<-function(cov,target,out,method,SD_cutoff,max_median=NULL,min_median=NULL){
   if(method == "sd"){method<-"SD"}
   cov <- unlist(strsplit(cov, ","))
   incov<-list()
@@ -111,10 +111,21 @@ p <- add_option(p, c("-l","--min_median"), help="REQUIRED IF method=manual. See 
 # parse
 args<-parse_args(p)
 
-suppressMessages(suppressWarnings(require(tidyverse,quietly =TRUE,warn.conflicts=FALSE)))
+# suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(ggplot2,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(Rsamtools,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(Biostrings,quietly =TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(segmented,quietly =TRUE,warn.conflicts=FALSE)))
-filterTargets(cov=args$cov,target=args$target,out=args$out,method=args$method,SD_cutoff=args$SD_cutoff,max_median=args$max_median,min_median=args$min_median)
+
+VetTargets_WGS(cov=args$cov,
+  target=args$target,
+  out=args$out,
+  method=args$method,
+  SD_cutoff=args$SD_cutoff,
+  max_median=args$max_median,
+  min_median=args$min_median)
 
 
 

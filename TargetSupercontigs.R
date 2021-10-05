@@ -12,9 +12,6 @@ TargetSupercontigs<-function(blast_file,genome,output_prefix,blacklist=NULL,btyp
     ######################
     ### START FUNCTION ###
     ######################
-    suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
-    suppressMessages(suppressWarnings(require(Biostrings,quietly=TRUE,warn.conflicts=FALSE)))
-    suppressMessages(suppressWarnings(require(Rsamtools,quietly=TRUE,warn.conflicts=FALSE)))
     
     if(btype=="blastn"){
       cat("Note: assuming blast file is output from blastn\n")
@@ -149,6 +146,12 @@ if(any(is.null(c(args$blast_file,args$genome,args$output_prefix)))) {
   print_help(p)
   cat("Hey hey hey! Some required arguments are missing.\n")
 }else{
+# suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(ggplot2,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(Biostrings,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(Rsamtools,quietly=TRUE,warn.conflicts=FALSE)))
 ## RUN
 TargetSupercontigs(blast_file=args$blast_file,
                    genome=args$genome,

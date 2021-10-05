@@ -376,7 +376,10 @@ p <- add_option(p, c("-i","--ingroup"), help="<File listing 'ingroup' samples. T
 args<-parse_args(p)
 
 suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
-suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+# suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
+suppressMessages(suppressWarnings(require(ggplot2,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(gplots,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(dendextend,quietly=TRUE,warn.conflicts=FALSE)))
 

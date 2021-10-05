@@ -18,11 +18,12 @@ Dependencies:
 ```
 R (https://cran.r-project.org/)
 R packages:
-    progress # for nice progress bars 
     optparse # for parsing opts
-    tidyverse # main workhorses are dplyr and tidyr. Also loads ggplot which does most of the plotting.
+    tidyr, dplyr # main workhorses in all scripts
+    ggplot2 # does most of the plotting
     ggrepel # useful for labeling plots
-    segmented # for automated paralog detection
+    progress # for nice progress bars 
+    segmented # for automated paralog detection via breakpoint regression
     gplots # for paralogy heatmaps 
     dendextend # for plotting dendrograms and/or phylogenies
     ape # for phylogenetic trees
@@ -30,13 +31,13 @@ R packages:
     Rsamtools # for indexing and extracting sequences from reference genome(s)
 
 ##  To install these, run:
-    install.packages(c("tidyverse","ggrepel","optparse","progress","segmented","gplots","dendextend"))
+    install.packages(c("tidyr","dplyr","ggplot2","ggrepel","optparse","progress","segmented","gplots","ape","dendextend"))
     if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
     BiocManager::install("Biostrings")
     BiocManager::install("Rsamtools")
 
 Optional:
-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) # if you plan to run VetHybPiper.sh
+ncbi-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) # needs to be in your $PATH if you plan to run VetHybPiper.sh or map_REF_to_targets.sh
 BBMap suite (https://sourceforge.net/projects/bbmap/) #  optional but recommended for VetHybPiper.sh
 ```
 
