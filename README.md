@@ -16,29 +16,36 @@ The R scripts run on the command line via `Rscript` (see examples below) and are
 
 Dependencies:
 ```
-R (https://cran.r-project.org/)
-R packages:
+#-- R (https://cran.r-project.org/)
+#-- R packages:
     optparse # for parsing opts
     tidyr, dplyr # main workhorses in all scripts
     ggplot2 # does most of the plotting
     ggrepel # useful for labeling plots
     progress # for nice progress bars 
+
+# for VetHybPiper.sh and DetectParalogs.R
     segmented # for automated paralog detection via breakpoint regression
     gplots # for paralogy heatmaps 
     dendextend # for plotting dendrograms and/or phylogenies
     ape # for phylogenetic trees
+
+# for TargetSupercontigs.R
     Biostrings # for handling sequences
     Rsamtools # for indexing and extracting sequences from reference genome(s)
 
-##  To install these, run:
+#  To install these, run:
     install.packages(c("tidyr","dplyr","ggplot2","ggrepel","optparse","progress","segmented","gplots","ape","dendextend"))
     if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
     BiocManager::install("Biostrings")
     BiocManager::install("Rsamtools")
 
-Optional:
-ncbi-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) # needs to be in your $PATH if you plan to run VetHybPiper.sh or map_REF_to_targets.sh
-BBMap suite (https://sourceforge.net/projects/bbmap/) #  optional but recommended for VetHybPiper.sh
+#-- Optional:
+ncbi-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) needs to be in your $PATH if you plan to run VetHybPiper.sh or map_REF_to_targets.sh
+BBMap suite (https://sourceforge.net/projects/bbmap/) # for VetHybPiper.sh, optional but recommended 
+
+#-- NOTE
+All of the wrapper scripts (*.sh) require linux OS.
 ```
 
 # Identify paralogs from HybPiper: **`VetHybPiper.sh`**
