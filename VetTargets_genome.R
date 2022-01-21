@@ -255,39 +255,43 @@ CheckTargets<-function(blast_file,
                        doCovPerChrom,
                        multicopyTarget,
                        genelist,
-                       blast_type){
+                       blast_type,
+                       doThin){
                          
   # suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
-  if(!file.exists(paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
-    dat <- as_tibble(read.table(blast_file,header=T))
-    cat("BLAST result has",nrow(dat),"rows.\n")
-    cat("BLAST type specified as",blast_type,".\n")
-    if(blast_type=="tblastx"){
-      cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
-      cat("Will remove hits <",min_fragment_length,"nucleotide base pairs long.\n")
-      dat$length.nuc<-dat$length*3
-    }else{
-      dat$length.nuc<-dat$length
+  dat <- as_tibble(read.table(blast_file,header=T))
+    if(doThin){
+      if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
+      cat("Now thinning BLAST result, which has",nrow(dat),"rows.\n")
+      cat("BLAST type specified as",blast_type,".\n")
+      if(blast_type=="tblastx"){
+        cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
+        cat("Will remove hits <",min_fragment_length,"nucleotide base pairs long.\n")
+        dat$length.nuc<-dat$length*3
+      }else{
+        dat$length.nuc<-dat$length
+      }
+      dat <- dat %>%
+        filter(pident >= min_pident,
+              length.nuc >= min_fragment_length)
+      cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
+      cat("Now removing redundant BLAST hits.\n")
+      dat <- ThinBlastResult(dat)
+      
+      write.table(dat,file = paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
+      cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
+      cat("This thinned blast result was written to",paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
+    } else{
+      cat("Thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
+      cat("Reading in",paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
+      dat<-as_tibble(read.table(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),header = T))
     }
-    dat <- dat %>%
-      filter(pident >= min_pident,
-             length.nuc >= min_fragment_length)
-    cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
-    cat("Now removing redundant BLAST hits.\n")
-    dat <- ThinBlastResult(dat)
-    
-    write.table(dat,file = paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
-    cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
-    cat("This thinned blast result was written to",paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
-  } else{
-    cat("Thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
-    cat("Reading in",paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
-    dat<-as_tibble(read.table(paste0(output_prefix,blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),header = T))
   }
+  
 
   if(!is.null(genelist)){
     gl <- scan(genelist,what="character")
@@ -385,6 +389,7 @@ p <- add_option(p, c("-C","--doCovPerChrom"), help="<Calculate per-chromosome co
 p <- add_option(p, c("-M","--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-g","--genelist"), help="<file listing genes to process, excluding any others>",type="character",default=NULL)
 p <- add_option(p, c("-B","--blast_type"), help="<blastn or tblastx? Default=blastn>",type="character",default="blastn")
+p <- add_option(p, c("-T","--doThin"), help="<whether to thin blast results>",type="logical",default=FALSE)
 
 # parse
 args<-parse_args(p)
@@ -406,7 +411,8 @@ if(is.null(args$blast_file)){
                    doCovPerChrom = args$doCovPerChrom,
                    multicopyTarget = args$multicopyTarget,
                    genelist = args$genelist,
-                   blast_type = args$blast_type))
+                   blast_type = args$blast_type,
+                   doThin = args$doThin))
   cat("VetTargets_genome.R is done!\n")
 }
 
