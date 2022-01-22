@@ -204,41 +204,48 @@ full_enumeration<-function(x,a,b){do.call(c,sapply(1:nrow(x),function(k){enumera
 full_containment<-function(x,a,b){mean(table(full_enumeration(x,a,b)))}
 
 ThinBlastResult<-function(data){
+  cat("Thinning blast result...\n")
   dat<-data
   dat$pair<-paste0(dat$qseqid,"_",dat$sseqid)
   new.dat<-data.frame()
-  
   pb <- progress_bar$new(total = length(unique(dat$pair)),
-                         clear=F,
+                         clear = F,
+                         show_after = 0,
                          format = "[:bar] :percent; elapsed :elapsed")
-  
+  # kombis_out<-list()
   for(i in unique(dat$pair)){
     pb$tick()
     dat.thin<-dat[dat$pair==i,] %>% arrange(desc(length))
     dat.thin.containment<-full_containment(dat.thin,"qstart","qend")
+    
     if(nrow(dat.thin)>1 & dat.thin.containment>=1.1){
       kombis<-data.frame(t(combn(1:nrow(dat.thin),m=2)))
       kombis$containment<-sapply(1:nrow(kombis),function(g) full_containment(dat.thin[c(kombis[g,1],kombis[g,2]),],"qstart","qend"))
+      kombis$pair<-i
       if(any(kombis$containment>=1.1)){
         kombis.todo<-kombis[kombis$containment>=1.1,]
         kombis.todo$worstscoring_index<-NA
         for(g in 1:nrow(kombis.todo)){
           my_pair<-c(kombis.todo[g,1],kombis.todo[g,2])
-          # containment<-full_containment(dat.thin[my_pair,],"qstart","qend")
-          kombis.todo[g,]$worstscoring_index<-ifelse(nrow(unique(dat.thin[my_pair,"bitscore"]))==2,
+          kombis.todo[g,]$worstscoring_index<-ifelse(length(unique(dat.thin[my_pair,"bitscore"]))==2,
                                                      yes=which(dat.thin[my_pair,"bitscore"]==min(dat.thin[my_pair,"bitscore"])),
-                                                     no=ifelse(nrow(unique(dat.thin[my_pair,"pident"]))==2,
+                                                     no=ifelse(length(unique(dat.thin[my_pair,"pident"]))==2,
                                                                which(dat.thin[my_pair,"pident"]==min(dat.thin[my_pair,"pident"])),
                                                                which(dat.thin[my_pair,"length"]==max(dat.thin[my_pair,"length"]))[1])
-          )## if scores are different, choose best, otherwise (very unlikely) choose best pident
+          )## if scores are different, choose best, otherwise (very unlikely) choose best pident, and of THOSE are identical, choose longest, and if THOSE are identical, choose first
         }
         kombis.todo$worstscoring<-sapply(1:nrow(kombis.todo),function(x) {kombis.todo[x,kombis.todo[x,"worstscoring_index"]]},simplify = "array")
         dat.thin<-dat.thin[-unique(as.numeric(kombis.todo$worstscoring)),]
         # dat.thin.containment<-full_containment(dat.thin,"qstart","qend")
       }
-      new.dat<-rbind(new.dat,dat.thin)
+      # kombis_out[[i]]<-kombis.todo
     }
+    new.dat<-rbind(new.dat,dat.thin)
   }
+  cat("Original blast result had",nrow(dat),"rows. After thinning",
+        nrow(new.dat),"rows (",round(nrow(new.dat)/nrow(dat)*100,1) ,"%) remain.\n")
+  # return(list(thinned_blast_result=new.dat,
+  #             combinations_list=kombis_out))
   return(new.dat)
 }
 
@@ -264,15 +271,15 @@ CheckTargets<-function(blast_file,
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
   dat <- as_tibble(read.table(blast_file,header=T))
-    if(doThin){
-      if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
+  if(doThin){
+    if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
       cat("Now thinning BLAST result, which has",nrow(dat),"rows.\n")
       cat("BLAST type specified as",blast_type,".\n")
       if(blast_type=="tblastx"){
         cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
         cat("Will remove hits <",min_fragment_length,"nucleotide base pairs long.\n")
         dat$length.nuc<-dat$length*3
-      }else{
+      } else {
         dat$length.nuc<-dat$length
       }
       dat <- dat %>%
@@ -285,7 +292,7 @@ CheckTargets<-function(blast_file,
       write.table(dat,file = paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
       cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
       cat("This thinned blast result was written to",paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
-    } else{
+    } else {
       cat("Thinned BLAST result already exists. Will read it in instead of repeating the thinning procedure.\n")
       cat("Reading in",paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),".\n")
       dat<-as_tibble(read.table(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),header = T))
@@ -389,7 +396,7 @@ p <- add_option(p, c("-C","--doCovPerChrom"), help="<Calculate per-chromosome co
 p <- add_option(p, c("-M","--multicopyTarget"), help="<does target file contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-g","--genelist"), help="<file listing genes to process, excluding any others>",type="character",default=NULL)
 p <- add_option(p, c("-B","--blast_type"), help="<blastn or tblastx? Default=blastn>",type="character",default="blastn")
-p <- add_option(p, c("-T","--doThin"), help="<whether to thin blast results>",type="logical",default=FALSE)
+p <- add_option(p, c("-T","--doThin"), help="<whether to thin blast results>",type="logical",default=TRUE)
 
 # parse
 args<-parse_args(p)
