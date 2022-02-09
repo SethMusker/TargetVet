@@ -8,11 +8,11 @@ TargetVet is an R-based toolkit for evolutionary studies (especially phylogenomi
 
     c. Target Capture data assembled using HybPiper: `VetHybPiper.sh`.
  2. Nicely visualise the **genomic context** of your targets relative to your study group.
- 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[(1)]] and should not be assumed to be in linkage equilibrium): Only `VetTargets_genome.R`.
+ 3. Identify genes with **huge intron(s)** (which are often present e.g. in many mammals [[1]] and should not be assumed to be in linkage equilibrium): Only `VetTargets_genome.R`.
  4. Extract supercontigs to use as targets for phylogenetics in closely related species (or population genomics): `TargetSupercontigs.R`.
 
 # Dependencies
-The R scripts run on the command line via `Rscript` (see examples below) and are therefore platform-independent. The functions `VetHybPiper.sh` and `map_WGS_to_targets.sh` use the bash shell programming language, the standard for linux.
+The R scripts run on the command line via `Rscript` (see examples below) and are therefore platform-independent. The functions `VetHybPiper.sh`,`map_REF_to_targets.sh` and `map_WGS_to_targets.sh` use the `bash` shell programming language, the standard for linux.
 
 Dependencies:
 ```
@@ -20,13 +20,14 @@ Dependencies:
 #-- R packages:
     optparse # for parsing opts
     tidyr, dplyr # main workhorses in all scripts
+    forcats # factor releveling
     ggplot2 # does most of the plotting
     ggrepel # useful for labeling plots
     progress # for nice progress bars 
 
 # for VetHybPiper.sh and DetectParalogs.R
     segmented # for automated paralog detection via breakpoint regression
-    gplots # for paralogy heatmaps 
+    gplots # for paralogy and missingness heatmaps 
     dendextend # for plotting dendrograms and/or phylogenies
     ape # for phylogenetic trees
 
@@ -35,14 +36,14 @@ Dependencies:
     Rsamtools # for indexing and extracting sequences from reference genome(s)
 
 #  To install these, run:
-    install.packages(c("tidyr","dplyr","ggplot2","ggrepel","optparse","progress","segmented","gplots","ape","dendextend"))
+    install.packages(c("tidyr","dplyr","forcats","ggplot2","ggrepel","optparse","progress","segmented","gplots","ape","dendextend"))
     if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
     BiocManager::install("Biostrings")
     BiocManager::install("Rsamtools")
 
 #-- Optional:
 ncbi-BLAST+ (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) needs to be in your $PATH if you plan to run VetHybPiper.sh or map_REF_to_targets.sh
-BBMap suite (https://sourceforge.net/projects/bbmap/) # for VetHybPiper.sh, optional but recommended 
+BBMap suite (https://sourceforge.net/projects/bbmap/) # for VetHybPiper.sh, optional but recommended - see below
 
 #-- NOTE
 All of the wrapper scripts (*.sh) require linux OS.
@@ -62,7 +63,7 @@ By default `blastn` is used, but if your targets are quite divergent from your s
 ## What does `VetHybPiper.sh` do?
 1. For each sample, fetch all the assembled contigs from the HybPiper output directory and collate them into a single all-target fasta.
 2. For each sample, nucleotide BLAST the contigs to the target fasta (the one you used as the reference for HybPiper).
-3. For each sample, run `VetTargets_genome.R` to calculate paralogy indices and more (see below). By default the script's plotting functionality if turned off as it can take a long time and is in this context not likely to be interesting. It can however be switched on using `-P TRUE`.
+3. For each sample, run `VetTargets_genome.R` to calculate paralogy indices and more (see below). By default the script's plotting functionality is turned off as it can take a long time and is, in this context, not likely to be interesting. It can however be switched on using `-P TRUE`.
 4. Across the sample set, run `DetectParalogs.R` on the previous step's output. If the reference fasta contains multiple copies of each target (in which case you need to specify `-M TRUE`), this will be done separately for each target source, with results output in separate folders named after each.
 
 To get detailed usage info and help, run `bash VetHybPiper.sh -h`.
@@ -95,6 +96,11 @@ Rscript VetTargets_genome.R -h
 # example run
 Rscript VetTargets_genome.R --blast_file blastn_yourtargets_to_yourgenome.withHeader.txt --min_fragment_length 0 --min_pident 70 --max_intron_length 1000 --max_intron_percent 50 --output_prefix targets2genome --min_display_intron 300
 ```
+
+### Getting the blast result for input
+You can either do it yourself (see below) or use `map_REF_to_targets.sh`. Run `bash map_REF_to_targets.sh -h` to get usage info.
+
+#### DIY blast run
 **NB:** The blast file must contain the following (tab-separated) fields, and have them as its first line:
 ```
 qseqid	sseqid	pident	length	mismatch	gapopen	qlen	qstart	qend	slen	sstart	send	evalue	bitscore
