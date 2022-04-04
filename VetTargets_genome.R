@@ -18,7 +18,7 @@
 
 
 ## TO DO
-# 1. Properly treat tblastx result
+# 1. Properly treat tblastx result - DONE (ThinBlastResult)
 # 2. differentiate containment and redundancy, and add length-prioritisation if bitscore and pident are equivalent
 
 GetCoverageStats<-function(data,doCovPerChrom=TRUE){

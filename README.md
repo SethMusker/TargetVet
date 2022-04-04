@@ -81,7 +81,7 @@ In cases where you have targets designed based on outgroup taxa and several outg
 # Designing a project: **`VetTargets_genome.R`** and **`VetTargets_WGS.R`**
 
 
-You're designing a target capture phylogenomics project and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many paralogs or other nasty surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
+You're planning a target capture phylogenomics project and you've designed or chosen your target set. What next? Well, if you've got genomic shotgun sequence data and/or a reference genome for one or more closely related species, then rather than moving forward with your sequencing project and hoping for decent recovery without too many paralogs or other nasty surprises, it's possible to use that WGS data to make life for your future self a little easier, while also improving the efficiency of your project.
 
 TargetVet provides methods for using WGS data and/or a reference genome to vet (i.e. filter) your target set before bait design. 
 

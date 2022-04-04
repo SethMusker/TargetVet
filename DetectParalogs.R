@@ -1,6 +1,16 @@
 
 DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
-    
+
+cat("Beginning DetectParalogs with the following parameters:\n")
+cat("Samples list:\t",samples,"\n")
+cat("VetTargets_genome results directory:\t",directory,"\n")
+cat("Output directory:\t",outdir,"\n")
+cat("Force overwrite of existing results in output directory?:\t",force,"\n")
+cat("input phylogeny:\t",phylogeny,"\n")
+cat("ingroup samples:\t",ingroup,"\n")
+cat("\n###----------------------------------------------------------------------###\n")
+
+
     if(dir.exists(outdir)){
         if(!force){
             stop("Specified output directory exists.\nTerminating. Use -f TRUE to overwrite.\n")
@@ -121,7 +131,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
     #####################
     ##### PHYLOGENY #####      
     #####################
-    if(is.null(phylogeny) | basename(phylogeny)=="NULL"){
+    if(is.null(phylogeny) | try(basename(phylogeny))=="NULL"){
         cat("no phylogeny provided. Moving on.\n")
     }else{
         cat("Phylogeny", phylogeny,"provided. Will make additional heatmap and a tanglegram.")
@@ -274,7 +284,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
 
     
     # Ingroup stuff #
-    if(is.null(ingroup) | basename(ingroup)=="NULL"){
+    if(is.null(ingroup) | try(basename(ingroup))=="NULL"){
         cat("No ingroup provided. Moving on.\n")
         }else{
         cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
@@ -320,7 +330,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
                     mean_paralogy_index=round(mean(paralogy_index),2),
                     diagnosis=ifelse(unique(orderMean)<=seg.mean.ingroup$psi[2],"Single","Paralog"),
                     .groups="keep")
-        write.table(out_meanSort_summary_ingroup,paste0(outdir,"/paralogy_summary_ingroup.txt"),
+        write.table(out_meanSort_summary_ingroup,paste0(outdir,"/DetectParalogs_results_summarised_ingroup.txt"),
                     quote=F,row.names=F,sep="\t")
         cat("Using ingroup samples -- Identified",sum(out_meanSort_summary_ingroup$diagnosis=="Paralog"),"paralogs!\n")
 
@@ -337,8 +347,8 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
     ### DONE PLOTTING ###
     #####################
     
-    out_meanSort %>% group_by(qseqid) %>% arrange(paralog_percent_ignoreMissing,.by_group=TRUE) %>%
-    write.table(paste0(outdir,"/paralogy_details.txt"),quote=F,row.names=F,sep="\t")
+    out_meanSort %>% group_by(qseqid) %>% arrange(paralog_percent_ignoreMissing,.by_group=TRUE) %>% as.data.frame() %>%
+        write.table(paste0(outdir,"/DetectParalogs_results_full.txt"),quote=F,row.names=F,sep="\t")
 
     out_meanSort_summary<-out_meanSort %>% group_by(qseqid) %>%
         summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
@@ -346,7 +356,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup){
                     mean_paralogy_index=round(mean(paralogy_index),2),
                     diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
                     .groups="keep")
-    write.table(out_meanSort_summary,paste0(outdir,"/paralogy_summary.txt"),
+    write.table(out_meanSort_summary,paste0(outdir,"/DetectParalogs_results_summarised.txt"),
                 quote=F,row.names=F,sep="\t")
     cat("Using all samples -- Identified",sum(out_meanSort_summary$diagnosis=="Paralog"),"paralogs!\n")
     
