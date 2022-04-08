@@ -8,7 +8,7 @@ cat("Output directory:\t",outdir,"\n")
 cat("Force overwrite of existing results in output directory?:\t",force,"\n")
 cat("input phylogeny:\t",phylogeny,"\n")
 cat("ingroup samples:\t",ingroup,"\n")
-cat("\n###----------------------------------------------------------------------###\n")
+cat("\n###----------------------------------------------------------------------###\n\n")
 
 
     if(dir.exists(outdir)){
@@ -128,9 +128,9 @@ cat("\n###----------------------------------------------------------------------
               offsetCol = 0.5)
     dev.off()
     
-    #####################
-    ##### PHYLOGENY #####      
-    #####################
+    ###################################
+    ##### PARALOGY with PHYLOGENY #####      
+    ###################################
     if(is.null(phylogeny) | try(basename(phylogeny))=="NULL"){
         cat("no phylogeny provided. Moving on.\n")
     }else{
@@ -176,6 +176,55 @@ cat("\n###----------------------------------------------------------------------
                                sub=paste0("Robinson-Foulds distance = ",obs.rf))
         dev.off()
     }
+
+    ##################
+    ### Copy Number ##
+    ##################
+    ggplot(out_meanSort)+
+        geom_raster(aes(x=qseqid,y=Sample,fill=paralogy_index_ignoreMissing))+
+        scale_fill_viridis_c("Copy number",option="D")+
+        labs(x="Target")+
+        theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    ggsave(paste0(outdir,"/Copy_number_heatmap.pdf"),width=28,height=20,units="cm")
+
+    # Clustered heatmap using gplots (heatmap2()) and dendextend
+    out_mat_samp_misscode<-out_meanSort %>% select(qseqid,Sample,paralogy_index_ignoreMissing) %>%
+        pivot_wider(names_from = qseqid ,values_from = paralogy_index_ignoreMissing, 
+        values_fill = -1)
+    out_mat_samp<-out_meanSort %>% select(qseqid,Sample,paralogy_index_ignoreMissing) %>%
+        pivot_wider(names_from = qseqid ,values_from = paralogy_index_ignoreMissing, 
+        values_fill = NA)
+    
+    out_mat_mat<-as.data.frame(out_mat_samp_misscode)
+    rownames(out_mat_mat)<-out_mat_mat$Sample
+    out_mat_mat<-out_mat_mat[,-1]
+    # order for rows
+    Rowv  <- out_mat_mat %>% dist %>% hclust %>% as.dendrogram %>%
+        set("branches_k_color", k = 4) %>% set("branches_lwd", 1.2) %>%
+        dendextend::ladderize()
+    # Order for columns: We must transpose the data
+    Colv  <- out_mat_mat %>% t %>% dist %>% hclust %>% as.dendrogram %>%
+        set("branches_k_color", k = 4) %>%
+        set("branches_lwd", 1.2) %>%
+        dendextend::ladderize()
+    out_mat_mat<-as.data.frame(out_mat_samp)
+    rownames(out_mat_mat)<-out_mat_mat$Sample
+    out_mat_mat<-out_mat_mat[,-1]
+    pdf(paste0(outdir,"/Copy_number_heatmap2_clustered.pdf"),width=40,height=20)
+    heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
+              col = c(viridisLite::viridis(100)),
+              Rowv = Rowv, Colv = Colv, 
+              cexRow = 1 + 1/log10(nrow(out_mat_mat)),
+              cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
+              margins=c(10,20),
+              key.title = "",
+              key.xlab = "Copy number",
+              key.par=list(cex.lab=2),
+              adjRow = c(0,0.5),
+              adjCol = c(0,0.5),
+              offsetRow = 0.5,
+              offsetCol = 0.5)
+    dev.off()
     
     ###############
     # missingness #
@@ -354,6 +403,7 @@ cat("\n###----------------------------------------------------------------------
         summarise(  mean_paralog_percent_ignoreMissing=round(mean(paralog_percent_ignoreMissing),1),
                     mean_missing_percent=round(mean(missing_percent),1),
                     mean_paralogy_index=round(mean(paralogy_index),2),
+                    mean_paralogy_index_ignoreMissing=round(mean(paralogy_index_ignoreMissing),2),
                     diagnosis=ifelse(unique(orderMean)<=seg.mean$psi[2],"Single","Paralog"),
                     .groups="keep")
     write.table(out_meanSort_summary,paste0(outdir,"/DetectParalogs_results_summarised.txt"),
@@ -377,7 +427,7 @@ p <- OptionParser(usage=" This script will take the CoverageStats output of VetT
                         many samples and detect paralogs in a targeted set of genes ")
 # Add a positional argument
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
-p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character",default=getwd())
+p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character",default=paste0(getwd(),"/DetectParalogs_results"))
 p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)

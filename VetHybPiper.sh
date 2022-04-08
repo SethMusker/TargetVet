@@ -78,7 +78,7 @@ if [[ ${DIR} == "." ]]; then
 fi
 
 if [[ ${DEDUPE} == "TRUE" ]]; then
-   echo "Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus!\n Using MINIDENTITY=${MINIDENTITY}"
+   echo "Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus (aka BBTools).\n Using MINIDENTITY=${MINIDENTITY}"
    OUTDIR=${DIR}/TargetVet_results_deduped_${MINIDENTITY}_${OUTSUFFIX}
 else
    OUTDIR=${DIR}/TargetVet_results_${OUTSUFFIX}
@@ -110,7 +110,7 @@ mkdir -p ${OUTDIR}/blast_out
 while read i;do
  BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
  if [[ -f "$BLASTOUT" ]]; then
-    echo "blast output exists for ${i}. Skipping."
+    echo "blast output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it something else, or remove the relevant files with the prefix ${BLAST_TYPE}."
  else   
       if [[ ${DEDUPE} == "TRUE" ]]; then
          SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta
@@ -185,11 +185,22 @@ echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
       echo "working on $TSN."
-      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output/${TSN} -o ${OUTDIR}/DetectParalogs_output/${TSN} -f ${FORCE} -i ${DIR}/${INGROUP} -p ${DIR}/${PHYLO}
+      Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} \
+         -d ${OUTDIR}/VetTargets_genome_output/${TSN} \
+         -o ${OUTDIR}/DetectParalogs_output/${TSN} \
+         -f ${FORCE} \
+         -i ${DIR}/${INGROUP} \
+         -p ${DIR}/${PHYLO}
       echo "finished $TSN."
   done < targetsourcenames.txt
 else
-   Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} -d ${OUTDIR}/VetTargets_genome_output -o ${OUTDIR}/DetectParalogs_output -f ${FORCE} -i ${DIR}/${INGROUP} -p ${DIR}/${PHYLO}
+   Rscript ${VETDIR}/DetectParalogs.R \
+      -s ${DIR}/${SAMPLES} \
+      -d ${OUTDIR}/VetTargets_genome_output \
+      -o ${OUTDIR}/DetectParalogs_output \
+      -f ${FORCE} \
+      -i ${DIR}/${INGROUP} \
+      -p ${DIR}/${PHYLO}
 fi
 
 echo "All done."

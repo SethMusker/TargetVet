@@ -39,7 +39,6 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
         }
         mycounts<-table(target_seq)-1 #subtract 1 because we've appended to the original sequence
         paralogy_index<-mean(mycounts)
-        paralogy_index_ignoreMissing<-mean(mycounts[mycounts>0])
         paralog_percent<-length(mycounts[mycounts>1])/unique(temp2$qlen)
         full_percent<-length(mycounts[mycounts>0])/unique(temp2$qlen)
         paralog_percent_ignoreMissing<-paralog_percent/full_percent
@@ -49,7 +48,6 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
                                                  data.frame(qseqid=unique(temp2$qseqid),
                                                             sseqid=unique(temp2$sseqid),
                                                             paralogy_index=round(paralogy_index,2),
-                                                            paralogy_index_ignoreMissing=round(paralogy_index_ignoreMissing,2),
                                                             paralog_percent=paralog_percent,
                                                             paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
                                                             full_percent=full_percent,
@@ -65,11 +63,10 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
     for(f in 1:nrow(temp)){
       target_seq2<-c(target_seq2,seq(temp[f,]$qstart,temp[f,]$qend))
     }
-    mycounts<-table(target_seq2)-1 #subtract 1 because we've appended to the original sequence, which is necessary for calculating missingness
+    mycounts<-table(target_seq2)-1 #subtract 1 because we've appended to the original sequence
     paralog_percent<-length(mycounts[mycounts>1])/qlenuniq
     # weighted_paralog_percent<-(length(mycounts[mycounts>1])*mean(mycounts[mycounts>1])/qlenuniq)
     paralogy_index<-mean(mycounts)
-    paralogy_index_ignoreMissing<-mean(mycounts[mycounts>0])    # this can be interpreted as copy number for recovered sequences
     full_percent<-length(mycounts[mycounts>0])/qlenuniq
     unique_percent<-length(mycounts[mycounts==1])/qlenuniq
     missing_percent<-length(mycounts[mycounts==0])/qlenuniq
@@ -77,7 +74,6 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
     coverage_summary_chromosome_UNaware<-rbind(coverage_summary_chromosome_UNaware,
                                                data.frame(qseqid=unique(temp$qseqid),
                                                           paralogy_index=round(paralogy_index,2),
-                                                          paralogy_index_ignoreMissing=round(paralogy_index_ignoreMissing,2),
                                                           paralog_percent=paralog_percent,
                                                           paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
                                                           full_percent=full_percent,
