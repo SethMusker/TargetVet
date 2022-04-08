@@ -21,6 +21,8 @@
 # 1. Properly treat tblastx result - DONE (ThinBlastResult)
 # 2. differentiate containment and redundancy, and add length-prioritisation if bitscore and pident are equivalent
 
+round_perc<-function(x) round(x,3)*100     # round and convert to percentage
+
 GetCoverageStats<-function(data,doCovPerChrom=TRUE){
   coverage_summary_chromosome_aware<-data.frame()
   coverage_summary_chromosome_UNaware<-data.frame()
@@ -50,11 +52,11 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
                                                             sseqid=unique(temp2$sseqid),
                                                             paralogy_index=round(paralogy_index,2),
                                                             paralogy_index_ignoreMissing=round(paralogy_index_ignoreMissing,2),
-                                                            paralog_percent=paralog_percent,
-                                                            paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
-                                                            full_percent=full_percent,
-                                                            unique_percent=unique_percent,
-                                                            missing_percent=missing_percent))
+                                                            paralog_percent=round_perc(paralog_percent),
+                                                            paralog_percent_ignoreMissing=round_perc(paralog_percent_ignoreMissing),
+                                                            full_percent=round_perc(full_percent),
+                                                            unique_percent=round_perc(unique_percent),
+                                                            missing_percent=round_perc(missing_percent)))
       }
     }
     
@@ -78,16 +80,17 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
                                                data.frame(qseqid=unique(temp$qseqid),
                                                           paralogy_index=round(paralogy_index,2),
                                                           paralogy_index_ignoreMissing=round(paralogy_index_ignoreMissing,2),
-                                                          paralog_percent=paralog_percent,
-                                                          paralog_percent_ignoreMissing=paralog_percent_ignoreMissing,
-                                                          full_percent=full_percent,
-                                                          unique_percent=unique_percent,
-                                                          missing_percent=missing_percent))
+                                                          paralog_percent=round_perc(paralog_percent),
+                                                          paralog_percent_ignoreMissing=round_perc(paralog_percent_ignoreMissing),
+                                                          full_percent=round_perc(full_percent),
+                                                          unique_percent=round_perc(unique_percent),
+                                                          missing_percent=round_perc(missing_percent)))
   }
-  # round and convert to percentage
   if(doCovPerChrom) {
-    coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:3],apply(coverage_summary_chromosome_aware[,4:ncol(coverage_summary_chromosome_aware)],2,function(x) round(x,3)*100)))
-    coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
+    # coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:4],apply(coverage_summary_chromosome_aware[,5:ncol(coverage_summary_chromosome_aware)],2,function(x) round(x,3)*100)))
+    # coverage_summary_chromosome_aware<-data.frame(cbind(coverage_summary_chromosome_aware[,1:4],apply(coverage_summary_chromosome_aware[,grep("percent",names(coverage_summary_chromosome_aware))],2,function(x) round(x,3)*100)))
+    # coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:3],apply(coverage_summary_chromosome_UNaware[,grep("percent",names(coverage_summary_chromosome_UNaware))],2,function(x) round(x,3)*100)))
+    
     coverage_summary_nchroms<-coverage_summary_chromosome_aware %>%
       group_by(qseqid) %>%
       summarise(n_chroms=n(),
@@ -96,7 +99,7 @@ GetCoverageStats<-function(data,doCovPerChrom=TRUE){
     return(list(coverage_summary_chromosome_aware=coverage_summary_chromosome_aware,coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
   }else{
     ## Note when doCovPerChrom=FALSE you don't get the n_chroms field
-    coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:2],apply(coverage_summary_chromosome_UNaware[,3:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
+    # coverage_summary_chromosome_UNaware<-data.frame(cbind(coverage_summary_chromosome_UNaware[,1:3],apply(coverage_summary_chromosome_UNaware[,4:ncol(coverage_summary_chromosome_UNaware)],2,function(x) round(x,3)*100)))
     return(list(coverage_summary_chromosome_unaware=coverage_summary_chromosome_UNaware))
   }
 }
@@ -278,6 +281,8 @@ CheckTargets<-function(blast_file,
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
+  cat("Beginning VetTargets_genome.R...\n")
+  cat("Reading blast file:", blast_file)
   dat <- as_tibble(read.table(blast_file,header=T))
   if(doThin){
     if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
@@ -309,7 +314,7 @@ CheckTargets<-function(blast_file,
   
 
   if(!is.null(genelist)){
-    gl <- scan(genelist,what="character")
+    gl <- suppressMessages(scan(genelist,what="character"))
   }
   ## for cases where we have multiple copies of each gene in the target file, 
   # split the blast results by copy source and run analyses separately on each.
