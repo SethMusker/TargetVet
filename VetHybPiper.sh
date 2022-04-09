@@ -73,8 +73,17 @@ B) BLAST_TYPE=${OPTARG};;
 esac
 done
 
+echo "\n\tStarting VetHybPiper.sh...\n\n"
+
 if [[ ${DIR} == "." ]]; then
    DIR=$PWD
+fi
+
+CRLF=$(file ${DIR}/${GENES} | grep 'CRLF' | wc -l)
+if [[ $CRLF -eq 1 ]]; then
+echo "Genelist ${DIR}/${GENES} has CRLF line endings. Creating fixed file."
+   sed 's/\r$//' ${DIR}/${GENES} > ${DIR}/${GENES}.CRLF-corrected.txt 
+   GENES=${GENES}.CRLF-corrected.txt 
 fi
 
 if [[ ${DEDUPE} == "TRUE" ]]; then
@@ -89,9 +98,9 @@ mkdir -p ${OUTDIR}/assemblies_collated
 while read i;do
 CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
  if [[ -f "$CONTIGS" ]]; then
-    echo "collated contigs exist for ${i}. Skipping."
+    echo "Collated contigs exist for ${i}. Skipping."
  else
- echo "collating contigs for ${i}."
+ echo "Collating contigs for ${i}."
     while read g; do
         if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
             gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
@@ -110,7 +119,7 @@ mkdir -p ${OUTDIR}/blast_out
 while read i;do
  BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
  if [[ -f "$BLASTOUT" ]]; then
-    echo "blast output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it something else, or remove the relevant files with the prefix ${BLAST_TYPE}."
+    echo "BLAST output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it to something else, or remove the relevant files in the blast_out directory with the prefix ${BLAST_TYPE}."
  else   
       if [[ ${DEDUPE} == "TRUE" ]]; then
          SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta
@@ -119,14 +128,14 @@ while read i;do
       fi
 
    if [[ ${BLAST_TYPE} == "tblastx" ]]; then
-      echo "Using tblastx."
+      echo "Using tblastx for ${i}."
       tblastx -query ${TARGETS} \
          -subject ${SUBJECT} \
          -out ${BLASTOUT} \
          -evalue 1e-6 \
          -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
    else
-      echo "Using blastn."
+      echo "Using blastn for ${i}."
       blastn -query ${TARGETS} \
          -subject ${SUBJECT} \
          -out ${BLASTOUT} \
@@ -146,7 +155,7 @@ COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_thinned_blast_result.txt
  if [[ -f "$COVSTATS" ]]; then
     echo "VetTargets_genome output exists for ${i}. Skipping."
  else
-    echo "running VetTargets_genome on ${i}."
+    echo "Running VetTargets_genome on ${i}."
     BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
     BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
     echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
@@ -184,14 +193,14 @@ fi
 echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
-      echo "working on $TSN."
+      echo "Working on $TSN..."
       Rscript ${VETDIR}/DetectParalogs.R -s ${DIR}/${SAMPLES} \
          -d ${OUTDIR}/VetTargets_genome_output/${TSN} \
          -o ${OUTDIR}/DetectParalogs_output/${TSN} \
          -f ${FORCE} \
          -i ${DIR}/${INGROUP} \
          -p ${DIR}/${PHYLO}
-      echo "finished $TSN."
+      echo "Finished $TSN."
   done < targetsourcenames.txt
 else
    Rscript ${VETDIR}/DetectParalogs.R \
@@ -203,4 +212,4 @@ else
       -p ${DIR}/${PHYLO}
 fi
 
-echo "All done."
+echo "VetHybPiper.sh finished!"
