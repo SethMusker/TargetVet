@@ -281,7 +281,7 @@ CheckTargets<-function(blast_file,
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
-  cat("Beginning VetTargets_genome.R...\n")
+  cat("\nBeginning VetTargets_genome.R...\n")
   cat("Reading blast file:", blast_file)
   dat <- as_tibble(read.table(blast_file,header=T))
   if(doThin){
@@ -433,6 +433,6 @@ if(is.null(args$blast_file)){
                    genelist = args$genelist,
                    blast_type = args$blast_type,
                    doThin = args$doThin))
-  cat("VetTargets_genome.R is done!\n")
+  cat("VetTargets_genome.R is done!\n\n#############################################")
 }
 

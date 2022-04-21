@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# To do:
+#  1. Make contig collation faster. E.g. parallelise across samples?
+
 usage(){
    echo "## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper.
    ## It also analyses and reports patterns of missingness, and plots all of these results in various ways.
