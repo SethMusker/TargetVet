@@ -26,7 +26,7 @@ Dependencies:
     progress # for nice progress bars 
 
 # for VetHybPiper.sh and DetectParalogs.R
-    segmented # for automated paralog detection via breakpoint regression
+    nplr and cumSeg # for automated paralog detection via breakpoint regression
     gplots # for paralogy and missingness heatmaps 
     dendextend # for plotting dendrograms and/or phylogenies
     ape # for phylogenetic trees
@@ -36,7 +36,7 @@ Dependencies:
     Rsamtools # for indexing and extracting sequences from reference genome(s)
 
 #  To install these, run:
-    install.packages(c("tidyr","dplyr","forcats","ggplot2","ggrepel","optparse","progress","segmented","gplots","ape","dendextend"))
+    install.packages(c("tidyr","dplyr","forcats","ggplot2","ggrepel","optparse","progress","nplr","cumSeg","gplots","ape","dendextend"))
     if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
     BiocManager::install("Biostrings")
     BiocManager::install("Rsamtools")
