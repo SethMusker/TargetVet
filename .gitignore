@@ -3,3 +3,4 @@ TargetVet_readings/*
 .tmp.driveupload/*
 .tmp.drivedownload/*
 .vscode/*
+.Rhistory
