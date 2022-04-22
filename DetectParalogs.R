@@ -282,7 +282,8 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                  data=data.frame(x=step.psi),
                  lty=2,
                  size=1,
-                 col="#1A85FF")   
+                 col="#1A85FF") +
+    geom_hline(yintercept=50,lty=2,size=0.5)   
   # geom_vline(xintercept = step.psi,lty=2,colour="#1A85FF",size=1)      
   ggsave(paste0(outdir,"/Paralog_detection_plot.pdf"),
          plot=step_nplr_plot,
@@ -318,11 +319,12 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     #              show.legend = F)+
     scale_alpha_manual(values=c(0.5,1))+
     # label outliers
-    geom_text(aes(x=plot_point_x,y=inflexion_y,label=label,hjust=label_hjust),
+    geom_text(aes(x=plot_point_x,y=plot_point_y,label=label,hjust=label_hjust),
               data=inflexions_df,na.rm=T)+
     # geom_point(aes(x=plot_point_x,y=inflexion_y,colour=big_deviant),
     #            data=inflexions_df,show.legend = F)+
-    scale_colour_manual(values=c("blue","#FFC107"))
+    scale_colour_manual(values=c("blue","#FFC107"))+
+    geom_hline(yintercept=50,lty=2,size=0.5) 
   ggsave(paste0(outdir,"/Paralog_detection_plot_samplewise.pdf"),
          plot=samplewise_nplr_plot,
          width=40,height=20,units = "cm")
@@ -338,7 +340,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=paralog_percent_ignoreMissing))+
     scale_fill_viridis_c("Paralogy (%)",option="D")+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
   ggsave(paste0(outdir,"/Paralogy_heatmap.pdf"),width=28,height=20,units="cm")
   
   # Clustered heatmap using gplots (heatmap2()) and dendextend
@@ -442,7 +444,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=paralogy_index_ignoreMissing))+
     scale_fill_viridis_c("Copy number",option="D")+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
   ggsave(paste0(outdir,"/Copy_number_heatmap.pdf"),width=28,height=20,units="cm")
   
   # Clustered heatmap using gplots (heatmap2()) and dendextend
@@ -494,7 +496,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
     scale_fill_viridis_c("Missingness (%)",option="magma",direction=1)+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
   ggsave(paste0(outdir,"/Missingness_heatmap.pdf"),width=28,height=20,units="cm")
   # Clustered heatmap using gplots (heatmap2()) and dendextend
   out_mat_samp<-out_meanSort %>% select(qseqid,Sample,missing_percent) %>%
