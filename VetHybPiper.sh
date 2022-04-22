@@ -155,7 +155,8 @@ cd ${OUTDIR}/VetTargets_genome_output
 
 
 while read i;do
-COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_thinned_blast_result.txt
+
+COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_${BLAST_TYPE}_Thinned_minPident${PIDENT}_minLength${LENGTH}.txt
  if [[ -f "$COVSTATS" ]]; then
     echo "VetTargets_genome output exists for ${i}. Skipping."
  else
@@ -181,9 +182,9 @@ COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_thinned_blast_result.txt
  fi
 done < ${DIR}/${SAMPLES}
 
-# 4. collate ContigStats_acrossChromosomes.txt
+# 4. collate CoverageStats_AcrossChromosomes.txt
 # AND
-# 5. detect paralogs using paralogyRate and breakpoint analysis
+# 5. detect paralogs using paralogy Rate and step-function/nplr analysis
 # AND
 # 6. Output genelists for paralogs and single-copy
 
@@ -194,6 +195,24 @@ if [[ ${MULTI} == "TRUE" ]]; then
    cut -d'-' -f1 ${BL} | sort | uniq > targetsourcenames.txt
 fi
 
+if [[ -f ${INGROUP} ]];then
+   echo "Ingroup file found."
+   ING="-i ${INGROUP}"
+else
+   echo "Ingroup file not found or not provided."
+   ING=""
+fi
+
+if [[ -f ${PHYLO} ]];then
+   echo "Phylogeny file found."
+   PHY="-p ${PHYLO}"
+else
+   echo "Phylogeny file not found or not provided."
+   PHY=""
+fi
+
+
+
 echo "Detecting paralogs..."
 if [[ ${MULTI} == "TRUE" ]]; then
    while read TSN; do
@@ -202,8 +221,8 @@ if [[ ${MULTI} == "TRUE" ]]; then
          -d ${OUTDIR}/VetTargets_genome_output/${TSN} \
          -o ${OUTDIR}/DetectParalogs_output/${TSN} \
          -f ${FORCE} \
-         -i ${DIR}/${INGROUP} \
-         -p ${DIR}/${PHYLO}
+         ${ING} \
+         ${PHY}
       echo "Finished $TSN."
   done < targetsourcenames.txt
 else
@@ -212,8 +231,8 @@ else
       -d ${OUTDIR}/VetTargets_genome_output \
       -o ${OUTDIR}/DetectParalogs_output \
       -f ${FORCE} \
-      -i ${DIR}/${INGROUP} \
-      -p ${DIR}/${PHYLO}
+      ${ING} \
+      ${PHY}
 fi
 
 echo "VetHybPiper.sh finished!"

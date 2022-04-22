@@ -1,5 +1,5 @@
 
-DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup,residual_cutoff){
+DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=NULL,residual_cutoff){
   
   cat("Beginning DetectParalogs with the following parameters:\n")
   cat("Samples list:\t",samples,"\n")
@@ -568,7 +568,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup,residu
   
   
   # Ingroup stuff #
-  if(is.null(ingroup) | try(basename(ingroup))=="NULL"){
+  if(is.null(ingroup)){
     cat("No ingroup provided. Moving on.\n")
   }else{
     cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
@@ -664,8 +664,8 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny,ingroup,residu
 suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=FALSE)))
 
 p <- OptionParser(usage=" This script will take the CoverageStats output of VetTargets_genome.R for \n
-                        many samples and detect paralogs in a targeted set of genes ")
-# Add a positional argument
+                        many samples and detect paralogs in a targeted set of genes. ")
+# Add a positional arguments
 p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
 p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character",default=paste0(getwd(),"/DetectParalogs_results"))
 p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")

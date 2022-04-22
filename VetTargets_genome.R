@@ -282,7 +282,7 @@ CheckTargets<-function(blast_file,
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
   cat("\nBeginning VetTargets_genome.R...\n")
-  cat("Reading blast file:", blast_file)
+  cat("Reading blast file:", blast_file,".\n")
   dat <- as_tibble(read.table(blast_file,header=T))
   if(doThin){
     if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
