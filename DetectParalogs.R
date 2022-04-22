@@ -8,7 +8,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   cat("Force overwrite of existing results in output directory?:\t",force,"\n")
   cat("input phylogeny:\t",phylogeny,"\n")
   cat("ingroup samples:\t",ingroup,"\n")
-  cat("\n###----------------------------------------------------------------------###\n\n")
+  cat("\n###-------------------------------------------------###\n\n")
   
   
   if(dir.exists(outdir)){
@@ -108,7 +108,8 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   nplr_mod_estimates$y.975[nplr_mod_estimates$y.975>100]<-NA
   nplr_mod_estimates$y.025[nplr_mod_estimates$y.025<0]<-NA
   
-  inflexion_estimates<-getEstimates(nplr_mod,getInflexion(nplr_mod)[2][,1])
+  # inflexion_estimates<-getEstimates(nplr_mod,getInflexion(nplr_mod)[2][,1])
+  inflexion_estimates<-getEstimates(nplr_mod,0.5)
   
   ## fit separate nplr models to each sample, check for concordance of inflexion estimates
   get_np_fit<-function(x,y){
@@ -137,6 +138,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
       mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) %>%
       arrange(paralog_percent_ignoreMissing)
   }
+  cat("Now fitting nplr models separately to each sample.\n")
   myfits<-lapply(out_meanSort_sampleSplit,function(S) get_np_fit(x=S$orderMean,y=S$paralog_percent_ignoreMissing))
   mycurves<-lapply(myfits,function(x) return(x$curves))
   myinflexions<-lapply(myfits,function(x) return(x$inflexions[1][,1]))
@@ -205,31 +207,29 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     cat("WARNING: some samples seem to have anomalous paralogy patterns!\n")
     cat("Specifically, their absolute mean observed minus expected paralogy rate exceeds",residual_cutoff,"%.\n")
     write.table(data.frame(x=inflexions_df$Sample[which(inflexions_df$big_deviant)]),
-                file=paste0(outdir,"/Anomalous_samples.csv"),quote=F,row.names=F,col.names=F)
-    cat("The names of these samples are written to the file 'Anomalous_samples.csv'.\n")
+                file=paste0(outdir,"/Paralogy_anomalous_samples.txt"),quote=F,row.names=F,col.names=F)
+    cat("The names of these samples are written to the file 'Paralogy_anomalous_samples.txt'.\n")
   }
     # Write out results
   # inflexions_df_out<-inflexions_df %>% select(sample,inflexion,inflexion_y,qq_deviation,big_deviant)
   inflexions_df_out<-inflexions_df
-  names(inflexions_df_out)[names(inflexions_df)=="inflexion"]<-"inflexion_ie_estimated_num_single_copy"
-  inflexions_df_out$inflexion_ie_estimated_num_single_copy<-round(inflexions_df_out$inflexion_ie_estimated_num_single_copy,0)
-  inflexions_df_out$estimated_num_paralogs<-max(out_meanSort$orderMean)-inflexions_df_out$inflexion_ie_estimated_num_single_copy
+  # inflexions_df_out$inflexion<-round(inflexions_df_out$inflexion,0)
+  # inflexions_df_out$estimated_num_paralogs<-max(out_meanSort$orderMean)-inflexions_df_out$inflexion
   inflexions_df_out<-left_join(inflexions_df_out,resid_model_coefs,"Sample")
   write.table(inflexions_df_out,
               paste0(outdir,"/Paralogy_estimates_samplewise.csv"),
               quote=F,row.names=F,sep=",")
-  cat("The results of the anomalous sample detection analysis are written to 'Paralogy_estimates_samplewise.csv'.\n")
+  cat("The results of the sample-wise paralogy and anomalous sample detection analysis are written to 'Paralogy_estimates_samplewise.csv'.\n")
   
   # make data for samplewise plot
   inflexions_df$plot_point_x<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
                                      yes=max(out_meanSort$orderMean),
                                      no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$myNP50)) # plot points at their NP50
   inflexions_df$label<-ifelse(inflexions_df$big_deviant,inflexions_df$Sample,NA)
-  inflexions_df$label_hjust<-
-    ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
-           yes=1,
-           no=ifelse(inflexions_df$inflexion < 1,0,
-                     ifelse(inflexions_df$inflexion < nplr_mod.psi,1,0)))
+  inflexions_df$label_hjust<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
+                                    yes=1,
+                                    no=ifelse(inflexions_df$inflexion < 1,0,
+                                              ifelse(inflexions_df$inflexion < nplr_mod.psi,1,0)))
   
   mycurves_combined<-left_join(mycurves_combined,
                                inflexions_df[,c("Sample","big_deviant")],
@@ -254,12 +254,32 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_line(aes(x=x,y=y),data=nplr_mod_estimates,size=1.5,col="#D41159")+ # nplr fit
     geom_line(aes(x=x,y=y.025),data=nplr_mod_estimates,colour="#D41159",lty=3,size=1)+ # lower CI
     geom_line(aes(x=x,y=y.975),data=nplr_mod_estimates,colour="#D41159",lty=3,size=1)+ # upper CI
-    geom_vline(xintercept = inflexion_estimates$x,lty=2,size=1,col="#D41159")+ 
-    geom_vline(xintercept = inflexion_estimates$x.025,lty=2,colour="#D41159",size=1)+
-    geom_vline(xintercept = inflexion_estimates$x.975,lty=2,colour="#D41159",size=1)+
+    # geom_vline(xintercept = inflexion_estimates$x,lty=2,size=1,col="#D41159")+ 
+    # geom_vline(xintercept = inflexion_estimates$x.025,lty=2,colour="#D41159",size=1)+
+    # geom_vline(xintercept = inflexion_estimates$x.975,lty=2,colour="#D41159",size=1)+
+    geom_segment(aes(x = x,xend=x,y=0,yend=100),
+                 data=inflexion_estimates,
+                 lty=2,
+                 size=1,
+                 col="#D41159")+ 
+    geom_segment(aes(x = x.025,xend=x.025,y=0,yend=100),
+                 data=inflexion_estimates,
+                 lty=2,
+                 size=0.75,
+                 col="#D41159")+ 
+    geom_segment(aes(x = x.975,xend=x.975,y=0,yend=100),
+                 data=inflexion_estimates,
+                 lty=2,
+                 size=0.75,
+                 col="#D41159")+ 
     geom_line(aes(x=orderMean,y=step.k1.pred),data=out_meanSort,colour="#1A85FF",size=1.5)+ # step-model fit
-    geom_vline(xintercept = step.psi,lty=2,colour="#1A85FF",size=1)      
-  ggsave(paste0(outdir,"/paralog_detection_plot.pdf"),
+    geom_segment(aes(x = x,xend=x,y=0,yend=100),
+                 data=data.frame(x=step.psi),
+                 lty=2,
+                 size=1,
+                 col="#1A85FF")   
+    # geom_vline(xintercept = step.psi,lty=2,colour="#1A85FF",size=1)      
+  ggsave(paste0(outdir,"/Paralog_detection_plot.pdf"),
          plot=step_nplr_plot,
          width=40,height=20,units = "cm")
   
@@ -298,7 +318,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     # geom_point(aes(x=plot_point_x,y=inflexion_y,colour=big_deviant),
     #            data=inflexions_df,show.legend = F)+
     scale_colour_manual(values=c("blue","#FFC107"))
-  ggsave(paste0(outdir,"/paralog_detection_plot_samplewise.pdf"),
+  ggsave(paste0(outdir,"/Paralog_detection_plot_samplewise.pdf"),
          plot=samplewise_nplr_plot,
          width=40,height=20,units = "cm")
   
@@ -314,7 +334,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     scale_fill_viridis_c("Paralogy (%)",option="D")+
     labs(x="Target")+
     theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
-  ggsave(paste0(outdir,"/paralogy_heatmap.pdf"),width=28,height=20,units="cm")
+  ggsave(paste0(outdir,"/Paralogy_heatmap.pdf"),width=28,height=20,units="cm")
   
   # Clustered heatmap using gplots (heatmap2()) and dendextend
   out_mat_samp_misscode<-out_meanSort %>% 
@@ -341,7 +361,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   out_mat_mat<-as.data.frame(out_mat_samp)
   rownames(out_mat_mat)<-out_mat_mat$Sample
   out_mat_mat<-out_mat_mat[,-1]
-  pdf(paste0(outdir,"/paralogy_heatmap2_clustered.pdf"),width=40,height=20)
+  pdf(paste0(outdir,"/Paralogy_heatmap_clustered.pdf"),width=40,height=20)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::viridis(100)),
             Rowv = Rowv, Colv = Colv, 
@@ -378,7 +398,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                               by="tipnames")
     # we make a matrix with rows following the order in which the samples appear in the phylogeny
     out_mat_mat_dendro_order<-out_mat_mat[match(dendromatnames$tipnames,rownames(out_mat_mat)),]
-    pdf(paste0(outdir,"/paralogy_heatmap2_clustered_phylogeny.pdf"),width=40,height=20)
+    pdf(paste0(outdir,"/Paralogy_heatmap_clustered_phylogeny.pdf"),width=40,height=20)
     heatmap.2(as.matrix(out_mat_mat_dendro_order),
               Rowv = dend_initial.ord,
               Colv = Colv,
@@ -398,7 +418,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     dev.off()
     ##Tanglegram plotting
     obs.rf<-dist.dendlist(dendlist(Rowv,dend_initial.ord))
-    pdf(paste0(outdir,"/phylogeny_vs_clustogram_paralogy_tanglegram.pdf"),width=14,height=7)
+    pdf(paste0(outdir,"/Phylogeny_vs_clustogram_paralogy_tanglegram.pdf"),width=14,height=7)
     dendextend::tanglegram(Rowv,dend_initial.ord,margin_inner = 4, lwd = 2, axes=F, 
                            main_left = "Paralogy clusters",
                            main_right= paste0("Given phylogeny\n",basename(phylogeny)),
@@ -443,7 +463,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   out_mat_mat<-as.data.frame(out_mat_samp)
   rownames(out_mat_mat)<-out_mat_mat$Sample
   out_mat_mat<-out_mat_mat[,-1]
-  pdf(paste0(outdir,"/Copy_number_heatmap2_clustered.pdf"),width=40,height=20)
+  pdf(paste0(outdir,"/Copy_number_heatmap_clustered.pdf"),width=40,height=20)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::viridis(100)),
             Rowv = Rowv, Colv = Colv, 
@@ -470,7 +490,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     scale_fill_viridis_c("Missingness (%)",option="magma",direction=1)+
     labs(x="Target")+
     theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=3.5))
-  ggsave(paste0(outdir,"/missingness_heatmap.pdf"),width=28,height=20,units="cm")
+  ggsave(paste0(outdir,"/Missingness_heatmap.pdf"),width=28,height=20,units="cm")
   # Clustered heatmap using gplots (heatmap2()) and dendextend
   out_mat_samp<-out_meanSort %>% select(qseqid,Sample,missing_percent) %>%
     pivot_wider(names_from = qseqid ,values_from = missing_percent, 
@@ -489,7 +509,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   #   set("branches_lwd", 1.2) %>%
   #   dendextend::ladderize()
   
-  pdf(paste0(outdir,"/missingness_heatmap2_clustered.pdf"),width=40,height=20)
+  pdf(paste0(outdir,"/Missingness_heatmap_clustered.pdf"),width=40,height=20)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::magma(100)),
             Rowv = Rowv, Colv = Colv, 
@@ -517,7 +537,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
     labs(y="Missingness(%)",x="Sample")+
     ggtitle("All targets.")
-  ggsave(paste0(outdir,"/missingness_boxplot_samplewise.pdf"),width=30,units = "cm")
+  ggsave(paste0(outdir,"/Missingness_boxplot_samplewise.pdf"),width=30,units = "cm")
   
   out_meanSort %>% 
     mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
@@ -528,7 +548,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
     labs(y="Missingness(%)",x="Sample")+
     ggtitle("Putative paralogs removed.")
-  ggsave(paste0(outdir,"/missingness_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
+  ggsave(paste0(outdir,"/Missingness_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
   
   # Plot paralogy
   out_meanSort %>% 
@@ -539,7 +559,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
     labs(y="Paralog Rate (%)",x="Sample")+
     ggtitle("All targets.")
-  ggsave(paste0(outdir,"/paralogy_boxplot_samplewise.pdf"),width=30,units = "cm")
+  ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise.pdf"),width=30,units = "cm")
   
   out_meanSort %>% 
     mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
@@ -550,7 +570,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
     labs(y="Paralog Rate (%)",x="Sample")+
     ggtitle("Putative paralogs removed.")
-  ggsave(paste0(outdir,"/paralogy_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
+  ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
   
   # # Plot residuals
   out_meanSort %>% 
@@ -559,12 +579,14 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     # geom_violin(scale="width")+  
     geom_boxplot(outlier.size = 0.5,outlier.shape = 1)+  
     geom_hline(yintercept=0,lty=2,size=1)+
+    geom_hline(yintercept=residual_cutoff,lty=2,size=0.5)+
+    geom_hline(yintercept=-residual_cutoff,lty=2,size=0.5)+
     geom_point(aes(x=Sample,y=Mean_residual_paralogy),data=resid_model_coefs,colour="red")+
     theme_bw()+
     labs(y="Obs - Exp paralogy (%)",x="Sample") +
     theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1),
           panel.grid =element_blank())
-  ggsave(paste0(outdir,"/paralogy_residuals_boxplot_samplewise.pdf"),width=30,units = "cm")
+  ggsave(paste0(outdir,"/Paralogy_residuals_boxplot_samplewise.pdf"),width=30,units = "cm")
   
   
   # Ingroup stuff #
@@ -619,10 +641,10 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     cat("Using ingroup samples -- Identified",sum(out_meanSort_summary_ingroup$diagnosis=="Paralog"),"paralogs!\n")
     
     out_meanSort_summary_ingroup %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
-      write.table(paste0(outdir,"/paralog_list_ingroup.csv"),
+      write.table(paste0(outdir,"/Paralog_list_ingroup.csv"),
                   quote=F,row.names=F,col.names=F,sep=",")
     out_meanSort_summary_ingroup %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
-      write.table(paste0(outdir,"/singleCopy_list_ingroup.csv"),
+      write.table(paste0(outdir,"/SingleCopy_list_ingroup.csv"),
                   quote=F,row.names=F,col.names=F,sep=",")
   }
   # ----
@@ -649,10 +671,10 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   cat("Using all samples -- Identified",sum(out_meanSort_summary$diagnosis=="Paralog"),"paralogs!\n")
   
   out_meanSort_summary %>% filter(diagnosis=="Paralog") %>% select(qseqid) %>%
-    write.table(paste0(outdir,"/paralog_list.csv"),
+    write.table(paste0(outdir,"/Paralog_list.csv"),
                 quote=F,row.names=F,col.names=F,sep=",")
   out_meanSort_summary %>% filter(diagnosis=="Single") %>% select(qseqid) %>%
-    write.table(paste0(outdir,"/singleCopy_list.csv"),
+    write.table(paste0(outdir,"/SingleCopy_list.csv"),
                 quote=F,row.names=F,col.names=F,sep=",")
   
   cat("\nDetectParalogs.R finished!\n")
@@ -699,7 +721,7 @@ try(DetectParalogs(samples = args$samples,
                    ingroup = args$ingroup,
                    residual_cutoff=args$residual_cutoff))
 
-sink(paste0(args$outdir,"/warnings.txt"))
+sink(paste0(args$outdir,"/Warnings.txt"))
 warnings()
 sink()
 cat("Warnings are written to warnings.txt. These are usually harmless.\n")
