@@ -210,6 +210,23 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                 file=paste0(outdir,"/Paralogy_anomalous_samples.txt"),quote=F,row.names=F,col.names=F)
     cat("The names of these samples are written to the file 'Paralogy_anomalous_samples.txt'.\n")
   }
+    # make data for samplewise plot
+  inflexions_df$plot_point_x<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
+                                     yes=max(out_meanSort$orderMean),
+                                     no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$NP50)) # plot points at their NP50
+  inflexions_df$plot_point_y<-NA
+  for(i in inflexions_df$Sample){
+    inflexions_df[inflexions_df$Sample==i,]$plot_point_y<-ifelse(inflexions_df[inflexions_df$Sample==i,]$inflexion_y <= 100 & inflexions_df[inflexions_df$Sample==i,]$inflexion_y > 0,
+                                                                 yes=inflexions_df[inflexions_df$Sample==i,]$inflexion_y,
+                                                                 no=mean(out_meanSort[out_meanSort$Sample==i,]$paralog_percent_ignoreMissing))  
+  }                                
+  
+  inflexions_df$label<-ifelse(inflexions_df$big_deviant,inflexions_df$Sample,NA)
+  inflexions_df$label_hjust<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
+                                    yes=1,
+                                    no=ifelse(inflexions_df$inflexion < 1,0,
+                                              ifelse(inflexions_df$inflexion < nplr_mod.psi,1,0)))
+  
   # Write out results
   inflexions_df_out<-inflexions_df
   inflexions_df_out$inflexion<-round(inflexions_df_out$inflexion,1)
@@ -219,23 +236,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
               quote=F,row.names=F,sep=",")
   cat("The results of the sample-wise paralogy and anomalous sample detection analysis are written to 'Paralogy_estimates_samplewise.csv'.\n")
   
-  # make data for samplewise plot
-  inflexions_df$plot_point_x<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
-                                     yes=max(out_meanSort$orderMean),
-                                     no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$NP50)) # plot points at their NP50
-  inflexions_df$plot_point_y<-NA
-  for(i in inflexions_df$Sample){
-    inflexions_df[inflexions_df$Sample==i,]$plot_point_y<-ifelse(inflexions_df[inflexions_df$Sample==i,]$inflexion_y <= 100 & inflexions_df[inflexions_df$Sample==i,]$inflexion_y > 0,
-                                                                 yes=inflexions_df[inflexions_df$Sample==i,]$inflexion_y,
-                                                                 no=mean(out_meanSort[out_meanSort$Sample==i,"paralog_percent_ignoreMissing"]))  
-  }                                
-  
-  inflexions_df$label<-ifelse(inflexions_df$big_deviant,inflexions_df$Sample,NA)
-  inflexions_df$label_hjust<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
-                                    yes=1,
-                                    no=ifelse(inflexions_df$inflexion < 1,0,
-                                              ifelse(inflexions_df$inflexion < nplr_mod.psi,1,0)))
-  
+
   mycurves_combined<-left_join(mycurves_combined,
                                inflexions_df[,c("Sample","big_deviant")],
                                "Sample")
