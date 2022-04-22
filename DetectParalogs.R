@@ -97,8 +97,8 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   names(resid_model_coefs)<-c("Mean_residual_paralogy","SE","t_value","p_value")
   resid_model_coefs$Sample<-factor(gsub("Sample","",row.names(resid_model_coefs)))
   residual_deviants<-resid_model_coefs[abs(resid_model_coefs$Mean_residual_paralogy)>residual_cutoff,"Sample"]
-
-
+  
+  
   ## Make some objects for plotting
   ## Get predicted values and 95% CIs
   newx <- getXcurve(nplr_mod)
@@ -159,7 +159,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   inflexions_df<-data.frame(Sample=names(myinflexions),
                             inflexion=do.call(c,myinflexions),
                             inflexion_y=do.call(c,myinflexions_y),
-                            myNP50=do.call(c,myNP50))
+                            NP50=do.call(c,myNP50))
   
   ## Get deviation from 'normality' as per default of qqplot (only if there are >= 5 samples)
   # cat("Now looking for anomalous (i.e. outlier) samples based on their estimated number of single-copy targets.\n")
@@ -210,11 +210,9 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                 file=paste0(outdir,"/Paralogy_anomalous_samples.txt"),quote=F,row.names=F,col.names=F)
     cat("The names of these samples are written to the file 'Paralogy_anomalous_samples.txt'.\n")
   }
-    # Write out results
-  # inflexions_df_out<-inflexions_df %>% select(sample,inflexion,inflexion_y,qq_deviation,big_deviant)
+  # Write out results
   inflexions_df_out<-inflexions_df
-  # inflexions_df_out$inflexion<-round(inflexions_df_out$inflexion,0)
-  # inflexions_df_out$estimated_num_paralogs<-max(out_meanSort$orderMean)-inflexions_df_out$inflexion
+  inflexions_df_out$inflexion<-round(inflexions_df_out$inflexion,1)
   inflexions_df_out<-left_join(inflexions_df_out,resid_model_coefs,"Sample")
   write.table(inflexions_df_out,
               paste0(outdir,"/Paralogy_estimates_samplewise.csv"),
@@ -224,7 +222,14 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   # make data for samplewise plot
   inflexions_df$plot_point_x<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
                                      yes=max(out_meanSort$orderMean),
-                                     no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$myNP50)) # plot points at their NP50
+                                     no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$NP50)) # plot points at their NP50
+  inflexions_df$plot_point_y<-NA
+  for(i in inflexions_df$Sample){
+    inflexions_df[inflexions_df$Sample==i,]$plot_point_y<-ifelse(inflexions_df[inflexions_df$Sample==i,]$inflexion_y <= 100 & inflexions_df[inflexions_df$Sample==i,]$inflexion_y > 0,
+                                                                 yes=inflexions_df[inflexions_df$Sample==i,]$inflexion_y,
+                                                                 no=mean(out_meanSort[out_meanSort$Sample==i,"paralog_percent_ignoreMissing"]))  
+  }                                
+  
   inflexions_df$label<-ifelse(inflexions_df$big_deviant,inflexions_df$Sample,NA)
   inflexions_df$label_hjust<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
                                     yes=1,
@@ -278,7 +283,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                  lty=2,
                  size=1,
                  col="#1A85FF")   
-    # geom_vline(xintercept = step.psi,lty=2,colour="#1A85FF",size=1)      
+  # geom_vline(xintercept = step.psi,lty=2,colour="#1A85FF",size=1)      
   ggsave(paste0(outdir,"/Paralog_detection_plot.pdf"),
          plot=step_nplr_plot,
          width=40,height=20,units = "cm")
@@ -384,9 +389,9 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   # if(is.null(phylogeny) | try(basename(phylogeny))=="NULL"){
   if(is.null(phylogeny)){
     cat("\n")
-      # cat("No phylogeny provided. Moving on.\n")
+    # cat("No phylogeny provided. Moving on.\n")
   }else{
-    cat("\nPhylogeny", phylogeny,"provided. Will make additional heatmap and a tanglegram.")
+    cat("\nPhylogeny", phylogeny,"provided. Will make additional heatmap and a tanglegram.\n")
     ## load tree and plot
     tree<-read.tree(phylogeny)
     dend_initial<-as.dendrogram(chronos(multi2di(tree)))
