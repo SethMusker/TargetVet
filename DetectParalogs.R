@@ -204,16 +204,17 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   # much simpler than above: define deviants based on their mean residuals
   inflexions_df$big_deviant<-inflexions_df$Sample %in% residual_deviants
   if(length(residual_deviants)>0){
-    cat("WARNING: some samples seem to have anomalous paralogy patterns!\n")
+    cat("WARNING:",length(residual_deviants),"samples seem to have anomalous paralogy patterns!\n")
     cat("Specifically, their absolute mean observed minus expected paralogy rate exceeds",residual_cutoff,"%.\n")
     write.table(data.frame(x=inflexions_df$Sample[which(inflexions_df$big_deviant)]),
                 file=paste0(outdir,"/Paralogy_anomalous_samples.txt"),quote=F,row.names=F,col.names=F)
     cat("The names of these samples are written to the file 'Paralogy_anomalous_samples.txt'.\n")
   }
     # make data for samplewise plot
-  inflexions_df$plot_point_x<-ifelse(inflexions_df$inflexion > max(out_meanSort$orderMean),
+  inflexions_df$plot_point_x<-ifelse(inflexions_df$NP50 > max(out_meanSort$orderMean),
                                      yes=max(out_meanSort$orderMean),
-                                     no=ifelse(inflexions_df$inflexion < 1,1,inflexions_df$NP50)) # plot points at their NP50
+                                     no=ifelse(inflexions_df$NP50 < 1,1,inflexions_df$NP50)) # plot points at their NP50
+  inflexions_df$plot_point_x[is.na(inflexions_df$plot_point_x)]<-max(out_meanSort$orderMean)/2
   inflexions_df$plot_point_y<-NA
   for(i in inflexions_df$Sample){
     inflexions_df[inflexions_df$Sample==i,]$plot_point_y<-ifelse(inflexions_df[inflexions_df$Sample==i,]$inflexion_y <= 100 & inflexions_df[inflexions_df$Sample==i,]$inflexion_y > 0,
@@ -251,7 +252,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     labs(y="Paralog Rate (%)",x="Target") +
     theme(axis.text.x = element_text(angle = 90,size=3.5,vjust=0.5,hjust=1),
           panel.grid =element_blank())+
-    ggtitle("n-parameter logistic regression and step-function model predictions")+
+    ggtitle("n-parameter logistic regression (magenta) and step-function (blue) model predictions.")+
     geom_bin2d(aes(x=qseqid,
                    y=paralog_percent_ignoreMissing),
                show.legend = F,data=out_meanSort)+
@@ -696,15 +697,20 @@ suppressMessages(suppressWarnings(require(optparse,quietly=TRUE,warn.conflicts=F
 p <- OptionParser(usage=" This script will take the CoverageStats output of VetTargets_genome.R for \n
                         many samples and detect paralogs in a targeted set of genes. ")
 # Add a positional arguments
-p <- add_option(p, c("-s","--samples"), help="<Required: list of sample names>",type="character")
-p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character",default=paste0(getwd(),"/DetectParalogs_results"))
-p <- add_option(p, c("-o","--outdir"), help="<Required: directory in which to write results>",type="character")
+p <- add_option(p, c("-s","--samples"), help="<Required: file listing sample names, one per line>",type="character")
+p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
+p <- add_option(p, c("-o","--outdir"), help="<Directory in which to write results. Defaults to ./DetectParalogs_results>",type="character",default=paste0(getwd(),"/DetectParalogs_results"))
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)
 p <- add_option(p, c("-i","--ingroup"), help="<File listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). \nA separate paralog detection analysis will be conducted using only the ingroup samples.>",type="character",default=NULL)
 p <- add_option(p, c("-r","--residual_cutoff"), help="<How to identify anomalous samples? If their absolute mean observed minus expected paralogy exceeds this value. See documentation for details.>",type="numeric",default=10)
 # parse
 args<-parse_args(p)
+
+if(any(c(is.null(args$samples),is.null(args$directory)))) {
+  print_help(p)
+  stop("Some required arguments are missing.")
+}
 
 # suppressMessages(suppressWarnings(require(segmented,quietly=TRUE,warn.conflicts=FALSE)))
 suppressMessages(suppressWarnings(require(cumSeg,quietly=TRUE,warn.conflicts=FALSE)))

@@ -2,8 +2,9 @@
 
 # To do:
 #  1. Make contig collation faster. E.g. parallelise across samples?
+#  2. If running on cluster, automatically add local R library path to scripts. 
 
-usage(){
+usage () {
    echo "## Bash script to use TargetVet to detect paralogs from data for many samples that have been assembled by HybPiper.
    ## It also analyses and reports patterns of missingness, and plots all of these results in various ways.
    ## ARGUMENTS
@@ -11,10 +12,10 @@ usage(){
    ##--- The following are REQUIRED. 
    #  -V **absolute** directory of VetTargets source code: without the trailing "/"
    #  -D directory of HybPiper output (i.e. with separate folders for each sample and for genes therein): without trailing "/". Can be '.' if current directory.
-   #  -O output directory suffix. output will be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
-   #  -T targets fasta (nucleotide): must be in directory specified in -D
-   #  -S file listing sample names to process: must be in directory specified in -D
-   #  -G file listing gene names to process: must be in directory specified in -D
+   #  -T targets fasta (nucleotide)
+   #  -S file listing sample names to process
+   #  -G file listing gene names to process
+   #  -O output directory suffix. Output will be written to a folder in the HybPiper directory and be named TargetVet_results_<suffix> or TargetVet_results_deduped_<minidentity>_<suffix> if -d=TRUE.
    #  -M does the target fasta contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names in the target fasta must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G argument) must still have just the gene names, i.e. gene001, for example.)
    
    ##--- The following arguments are OPTIONAL.
@@ -29,6 +30,8 @@ usage(){
    #  -i file listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). A separate paralog detection analysis will be conducted using only the ingroup samples.
    #  -p rooted tree in Newick format. If provided, will make an additional paralogy heatmap using this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.
    #  -P do plots for each sample with VetTargets_genome.R? Time-consuming and not necessary. Default = FALSE.
+   #  -X speed things up using GNU Parallel? Default = FALSE
+   #  -t number of threads to use for multithreaded operations? This includes GNU parallel and BLAST.
    "
 }
 if [ -z "$1" ] || [[ $1 == -h ]] || [[ $1 == --help ]]; then
@@ -49,8 +52,10 @@ DO_PLOTS=FALSE
 BLAST_TYPE=blastn
 PHYLO=NULL
 INGROUP=NULL
+PARALLEL=FALSE
+THREADS=1
 ## parse args
-while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B:X:t: option
 do
 case "${option}"
 in
@@ -73,9 +78,16 @@ i) INGROUP=${OPTARG};;
 p) PHYLO=${OPTARG};;
 P) DO_PLOTS=${OPTARG};;
 B) BLAST_TYPE=${OPTARG};;
+X) PARALLEL=${OPTARG};;
+t) THREADS=${OPTARG};;
 
 esac
 done
+
+if [[ ${PARALLEL} == "TRUE" ]] && [[ ${THREADS} -eq 1 ]]; then
+   echo "You have chosen to use parallelisation but not specified more than 1 thread. Use the -t argument. Exiting."
+   exit
+fi
 
 echo "Starting VetHybPiper.sh..."
 
@@ -83,104 +95,203 @@ if [[ ${DIR} == "." ]]; then
    DIR=$PWD
 fi
 
+if [[ ! -f ${GENES} ]] && [[ ! -f ${DIR}/${GENES} ]]; then
+   echo "Couldn't find gene list ${GENES}. Exiting."
+   exit
+fi
+if [[ ! -f ${SAMPLES} ]] && [[ ! -f ${DIR}/${SAMPLES} ]]; then
+   echo "Couldn't find sample list ${SAMPLES}. Exiting."
+   exit
+fi
+if [[ ! -f ${TARGETS} ]] && [[ ! -f ${DIR}/${TARGETS} ]]; then
+   echo "Couldn't find target fasta ${TARGETS}. Exiting."
+   exit
+fi
+
+
+# If full paths are provided and they're not pointing to files within ${DIR} subdirectories, 
+# change them to basename and copy into ${DIR} if they're not already there.
+is_full_path () { echo $1 | grep '/' | wc -l; }
+FP=$(is_full_path ${GENES})
+if [[ $FP -eq 1 ]] && [[ ! -f ${DIR}/${GENES} ]]; then
+   if [[ ! -f ${DIR}/$(basename ${GENES}) ]];then
+      cp ${GENES} ${DIR}
+   fi
+   GENES=$(basename ${GENES})
+fi
+FP=$(is_full_path ${SAMPLES})
+if [[ $FP -eq 1 ]] && [[ ! -f ${DIR}/${SAMPLES} ]]; then
+   if [[ ! -f ${DIR}/$(basename ${SAMPLES}) ]];then
+      cp ${SAMPLES} ${DIR}
+   fi
+   SAMPLES=$(basename ${SAMPLES})
+fi
+FP=$(is_full_path ${TARGETS})
+if [[ $FP -eq 1 ]] && [[ ! -f ${DIR}/${TARGETS} ]]; then
+   if [[ ! -f ${DIR}/$(basename ${TARGETS}) ]];then
+      cp ${TARGETS} ${DIR}
+   fi
+   TARGETS=$(basename ${TARGETS})
+fi
+
+# Fix CRLF line endings if they exist, as they mess with the while loops
 CRLF=$(file ${DIR}/${GENES} | grep 'CRLF' | wc -l)
 if [[ $CRLF -eq 1 ]]; then
-echo "Genelist ${DIR}/${GENES} has CRLF line endings. Creating fixed file."
+   echo "Gene list ${DIR}/${GENES} has CRLF line endings. Creating fixed file."
    sed 's/\r$//' ${DIR}/${GENES} > ${DIR}/${GENES}.CRLF-corrected.txt 
    GENES=${GENES}.CRLF-corrected.txt 
 fi
+CRLF=$(file ${DIR}/${SAMPLES} | grep 'CRLF' | wc -l)
+if [[ $CRLF -eq 1 ]]; then
+   echo "Sample list ${DIR}/${SAMPLES} has CRLF line endings. Creating fixed file."
+   sed 's/\r$//' ${DIR}/${SAMPLES} > ${DIR}/${SAMPLES}.CRLF-corrected.txt 
+   SAMPLES=${SAMPLES}.CRLF-corrected.txt 
+fi
 
+# set the name of the output directory
 if [[ ${DEDUPE} == "TRUE" ]]; then
-   echo "Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus (aka BBTools).\n Using MINIDENTITY=${MINIDENTITY}"
+   echo -e "Ah, so you have chosen deduplication. Summoning Bestus Bioinformaticus! (aka BBTools).\n Using MINIDENTITY=${MINIDENTITY}"
    OUTDIR=${DIR}/TargetVet_results_deduped_${MINIDENTITY}_${OUTSUFFIX}
 else
    OUTDIR=${DIR}/TargetVet_results_${OUTSUFFIX}
 fi
 
+echo "All output will be written to ${OUTDIR}"
+mkdir -p ${OUTDIR}
+
 # 1. make TargetVet results folder and collate spades scaffolds per sample
 mkdir -p ${OUTDIR}/assemblies_collated
 while read i;do
-CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
- if [[ -f "$CONTIGS" ]]; then
-    echo "Collated contigs exist for ${i}. Skipping."
- else
- echo "Collating contigs for ${i}."
-    while read g; do
-        if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
-            gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
-        fi
-        cat ${DIR}/${i}/${g}/${g}_contigs.fasta
-    done < ${DIR}/${GENES} > ${CONTIGS}
+   CONTIGS=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+   if [[ -f ${CONTIGS} ]]; then
+      echo "Collated contigs exist for ${i}. Skipping."
+   else
+      echo "Collating contigs for ${i}."
 
-    if [[ ${DEDUPE} == "TRUE" ]]; then
-      dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${CONTIGS}.dedupe.log
-    fi
- fi
+      if [[ ${PARALLEL} == "TRUE" ]]; then
+         ## parallel cat
+         cat_contigs () {
+            if [[ -f ${DIR}/${i}/${1}/${1}_contigs.fasta.gz ]]; then
+                  gzip -d ${DIR}/${i}/${1}/${1}_contigs.fasta.gz
+            fi
+            cat ${DIR}/${i}/${1}/${1}_contigs.fasta
+         }
+         echo "Collating contigs in parallel for sample ${i}."
+         parallel -j ${THREADS} --group "cat_contigs {}" :::: ${DIR}/${GENES} > ${CONTIGS}
+      else
+         while read g; do
+            if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
+               gzip -d ${DIR}/${i}/${g}/${g}_contigs.fasta.gz
+            fi
+            cat ${DIR}/${i}/${g}/${g}_contigs.fasta
+         done < ${DIR}/${GENES} > ${CONTIGS}
+      fi
+
+      if [[ ${DEDUPE} == "TRUE" ]] && [[ ${PARALLEL} == "FALSE" ]]; then
+         dedupe.sh in=${CONTIGS} out=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${CONTIGS}.dedupe.log
+      fi
+   fi
 done < ${DIR}/${SAMPLES}
+
+if [[ ${DEDUPE} == "TRUE" ]] && [[ ${PARALLEL} == "TRUE" ]]; then
+   echo "Running dedupe.sh on collated contigs in parallel across samples."
+   parallel -j ${THREADS} "dedupe.sh in=${OUTDIR}/assemblies_collated/{}_all_contigs.fasta out=${OUTDIR}/assemblies_collated/{}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${OUTDIR}/assemblies_collated/{}_all_contigs.fasta.dedupe.log" :::: ${DIR}/${SAMPLES}
+fi
 
 # 2. blast to TARGETS
 mkdir -p ${OUTDIR}/blast_out
 while read i;do
- BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
- if [[ -f "$BLASTOUT" ]]; then
-    echo "BLAST output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it to something else, or remove the relevant files in the blast_out directory with the prefix ${BLAST_TYPE}."
- else   
+   BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+   if [[ -f ${BLASTOUT} ]]; then
+      echo "BLAST output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it to something else, or remove the relevant files in the blast_out directory with the prefix ${BLAST_TYPE}."
+   else   
+      # if blast output doesn't exist, run blast
       if [[ ${DEDUPE} == "TRUE" ]]; then
          SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta
       else
          SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
       fi
 
-   if [[ ${BLAST_TYPE} == "tblastx" ]]; then
-      echo "Using tblastx for ${i}."
-      tblastx -query ${TARGETS} \
-         -subject ${SUBJECT} \
-         -out ${BLASTOUT} \
-         -evalue 1e-6 \
-         -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
-   else
-      echo "Using blastn for ${i}."
-      blastn -query ${TARGETS} \
-         -subject ${SUBJECT} \
-         -out ${BLASTOUT} \
-         -evalue 1e-6 \
-         -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"      
+      if [[ ${BLAST_TYPE} == "tblastx" ]]; then
+         echo "Using tblastx for ${i}."
+         tblastx -query ${TARGETS} \
+            -subject ${SUBJECT} \
+            -out ${BLASTOUT} \
+            -evalue 1e-6 \
+            -num_threads ${THREADS} \
+            -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
+      else
+         echo "Using blastn for ${i}."
+         blastn -query ${TARGETS} \
+            -subject ${SUBJECT} \
+            -out ${BLASTOUT} \
+            -evalue 1e-6 \
+            -num_threads ${THREADS} \
+            -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"      
+      fi
    fi
- fi
 done < ${DIR}/${SAMPLES}
 
 # 3. run VetTargets_genome.R with --doPlots FALSE
 mkdir -p ${OUTDIR}/VetTargets_genome_output
 cd ${OUTDIR}/VetTargets_genome_output
 
-
-while read i;do
-
-COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_${BLAST_TYPE}_Thinned_minPident${PIDENT}_minLength${LENGTH}.txt
- if [[ -f "$COVSTATS" ]]; then
-    echo "VetTargets_genome output exists for ${i}. Skipping."
- else
-    echo "Running VetTargets_genome on ${i}."
-    BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
-    BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
-    echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
-        cat - ${BL} > ${BLH}
-    
-    Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
-      --output_prefix ${i} \
-      --min_fragment_length ${LENGTH} \
-      --min_pident ${PIDENT} \
-      --max_intron_length 10000 \
-      --max_intron_percent 1 \
-      --min_display_intron 10 \
-      --doPlots ${DO_PLOTS} \
-      --doIntronStats ${DO_INTRON} \
-      --doCovPerChrom ${DO_PER_CHROM} \
-      --multicopyTarget ${MULTI} \
-      --genelist ${DIR}/${GENES} \
-      --blast_type ${BLAST_TYPE}
- fi
-done < ${DIR}/${SAMPLES}
+if [[ ${PARALLEL} == "FALSE" ]]; then
+   while read i;do
+      COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_CoverageStats_AcrossChromosomes.txt
+      if [[ -f ${COVSTATS} ]]; then
+         echo "VetTargets_genome coverage stats output exists for ${i}. Skipping."
+      else
+         echo "Running VetTargets_genome on ${i}."
+         BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+         BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
+         echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
+            cat - ${BL} > ${BLH}
+         
+         Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
+            --output_prefix ${i} \
+            --min_fragment_length ${LENGTH} \
+            --min_pident ${PIDENT} \
+            --max_intron_length 10000 \
+            --max_intron_percent 1 \
+            --min_display_intron 10 \
+            --doPlots ${DO_PLOTS} \
+            --doIntronStats ${DO_INTRON} \
+            --doCovPerChrom ${DO_PER_CHROM} \
+            --multicopyTarget ${MULTI} \
+            --genelist ${DIR}/${GENES} \
+            --blast_type ${BLAST_TYPE}
+      fi
+   done < ${DIR}/${SAMPLES}
+else
+   run_VetTargets () {
+      local COVSTATS=${OUTDIR}/VetTargets_genome_output/${1}_CoverageStats_AcrossChromosomes.txt
+      if [[ -f ${COVSTATS} ]]; then
+         echo "VetTargets_genome coverage stats output exists for ${1}. Skipping."
+      else
+         echo "Running VetTargets_genome on ${1}."
+         local BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${1}_all_contigs.txt
+         local BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${1}_all_contigs.withHeader.txt
+         echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
+            cat - ${BL} > ${BLH}
+         
+         Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
+            --output_prefix ${1} \
+            --min_fragment_length ${LENGTH} \
+            --min_pident ${PIDENT} \
+            --max_intron_length 10000 \
+            --max_intron_percent 1 \
+            --min_display_intron 10 \
+            --doPlots ${DO_PLOTS} \
+            --doIntronStats ${DO_INTRON} \
+            --doCovPerChrom ${DO_PER_CHROM} \
+            --multicopyTarget ${MULTI} \
+            --genelist ${DIR}/${GENES} \
+            --blast_type ${BLAST_TYPE}
+      fi
+   }
+   parallel -j ${THREADS} "run_VetTargets {}" :::: ${DIR}/${SAMPLES}
+fi
 
 # 4. collate CoverageStats_AcrossChromosomes.txt
 # AND
