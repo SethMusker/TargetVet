@@ -20,6 +20,7 @@ usage () {
    
    ##--- The following arguments are OPTIONAL.
    #  -B what type of BLAST to use? Options currently are blastn or tblastx. The latter is potentially more sensitive but also much more time-consuming. Default = blastn.
+   #  -E what e-value to use as a cutoff for keeping matches in blast results. Default = 1e-6.
    #  -L minimum length of blast matches to keep for analysis. Default = 150bp.
    #  -K minimum percent identity (pident) of blast matches to Keep for analysis. Default = 70.
    #  -I do IntronStats? default = TRUE
@@ -54,8 +55,9 @@ PHYLO=NULL
 INGROUP=NULL
 PARALLEL=FALSE
 THREADS=1
+EVALUE=1e-6
 ## parse args
-while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B:X:t: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B:X:t:E: option
 do
 case "${option}"
 in
@@ -78,16 +80,32 @@ i) INGROUP=${OPTARG};;
 p) PHYLO=${OPTARG};;
 P) DO_PLOTS=${OPTARG};;
 B) BLAST_TYPE=${OPTARG};;
+E) EVALUE=${OPTARG};;
 X) PARALLEL=${OPTARG};;
 t) THREADS=${OPTARG};;
 
 esac
 done
 
+if [[ ${PARALLEL} == "TRUE" ]] && [[ $(which parallel | wc -l) -eq 0 ]]; then
+   echo "You have chosen to use parallelisation but it does not seem to be in your PATH."
+   echo -e "You can add it to your path by running \nexport PATH='\$PATH:path/to/parallel'"
+   echo "Setting parallel to FALSE and proceeding."
+   PARALLEL=FALSE
+fi
+
 if [[ ${PARALLEL} == "TRUE" ]] && [[ ${THREADS} -eq 1 ]]; then
    echo "You have chosen to use parallelisation but not specified more than 1 thread. Use the -t argument. Exiting."
    exit
 fi
+
+# we need to source env_parallel.bash in order to make env_parallel a function
+# this has to be done *inside* VetHybPiper.sh because it is invoked as a separate bash process to
+# the one running on the compute node (assuming this is running on a cluster)
+if [[ ${PARALLEL} == "TRUE" ]]; then
+	. `which env_parallel.bash`
+fi
+
 
 echo "Starting VetHybPiper.sh..."
 
@@ -170,14 +188,18 @@ while read i;do
 
       if [[ ${PARALLEL} == "TRUE" ]]; then
          ## parallel cat
-         cat_contigs () {
+         cat_contigs(){
             if [[ -f ${DIR}/${i}/${1}/${1}_contigs.fasta.gz ]]; then
                   gzip -d ${DIR}/${i}/${1}/${1}_contigs.fasta.gz
             fi
             cat ${DIR}/${i}/${1}/${1}_contigs.fasta
          }
+         # export -f cat_contigs
          echo "Collating contigs in parallel for sample ${i}."
-         parallel -j ${THREADS} --group "cat_contigs {}" :::: ${DIR}/${GENES} > ${CONTIGS}
+         env_parallel --env cat_contigs \
+            --env DIR \
+            --env i \
+            -j ${THREADS} "cat_contigs {}" :::: ${DIR}/${GENES} > ${CONTIGS}
       else
          while read g; do
             if [[ -f ${DIR}/${i}/${g}/${g}_contigs.fasta.gz ]]; then
@@ -195,78 +217,65 @@ done < ${DIR}/${SAMPLES}
 
 if [[ ${DEDUPE} == "TRUE" ]] && [[ ${PARALLEL} == "TRUE" ]]; then
    echo "Running dedupe.sh on collated contigs in parallel across samples."
-   parallel -j ${THREADS} "dedupe.sh in=${OUTDIR}/assemblies_collated/{}_all_contigs.fasta out=${OUTDIR}/assemblies_collated/{}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${OUTDIR}/assemblies_collated/{}_all_contigs.fasta.dedupe.log" :::: ${DIR}/${SAMPLES}
+   env_parallel \
+      --env OUTDIR \
+      --env MINIDENTITY \
+      -j ${THREADS} "dedupe.sh in=${OUTDIR}/assemblies_collated/{}_all_contigs.fasta out=${OUTDIR}/assemblies_collated/{}_all_contigs_deduped_${MINIDENTITY}.fasta threads=1 minidentity=${MINIDENTITY} 2> ${OUTDIR}/assemblies_collated/{}_all_contigs.fasta.dedupe.log" :::: ${DIR}/${SAMPLES}
 fi
 
 # 2. blast to TARGETS
 mkdir -p ${OUTDIR}/blast_out
-while read i;do
-   BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
+run_blast(){
+   local BLASTOUT=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${1}_all_contigs.txt
    if [[ -f ${BLASTOUT} ]]; then
-      echo "BLAST output exists for ${i}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it to something else, or remove the relevant files in the blast_out directory with the prefix ${BLAST_TYPE}."
+      echo "BLAST output exists for ${1}. Skipping. If you wish to redo the ${BLAST_TYPE} step, move the folder 'blast_out' to another directory, rename it to something else, or remove the relevant files in the blast_out directory with the prefix ${BLAST_TYPE}."
    else   
       # if blast output doesn't exist, run blast
       if [[ ${DEDUPE} == "TRUE" ]]; then
-         SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs_deduped_${MINIDENTITY}.fasta
+         local SUBJECT=${OUTDIR}/assemblies_collated/${1}_all_contigs_deduped_${MINIDENTITY}.fasta
       else
-         SUBJECT=${OUTDIR}/assemblies_collated/${i}_all_contigs.fasta
+         local SUBJECT=${OUTDIR}/assemblies_collated/${1}_all_contigs.fasta
       fi
 
       if [[ ${BLAST_TYPE} == "tblastx" ]]; then
-         echo "Using tblastx for ${i}."
+         echo "Mapping contigs to targets using tblastx for ${1}."
          tblastx -query ${TARGETS} \
             -subject ${SUBJECT} \
             -out ${BLASTOUT} \
-            -evalue 1e-6 \
-            -num_threads ${THREADS} \
+            -evalue ${EVALUE} \
             -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
       else
-         echo "Using blastn for ${i}."
+         echo "Mapping contigs to targets using blastn for ${1}."
          blastn -query ${TARGETS} \
             -subject ${SUBJECT} \
             -out ${BLASTOUT} \
-            -evalue 1e-6 \
-            -num_threads ${THREADS} \
+            -evalue ${EVALUE} \
             -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"      
       fi
    fi
-done < ${DIR}/${SAMPLES}
-
-# 3. run VetTargets_genome.R with --doPlots FALSE
-mkdir -p ${OUTDIR}/VetTargets_genome_output
-cd ${OUTDIR}/VetTargets_genome_output
+}
 
 if [[ ${PARALLEL} == "FALSE" ]]; then
    while read i;do
-      COVSTATS=${OUTDIR}/VetTargets_genome_output/${i}_CoverageStats_AcrossChromosomes.txt
-      if [[ -f ${COVSTATS} ]]; then
-         echo "VetTargets_genome coverage stats output exists for ${i}. Skipping."
-      else
-         echo "Running VetTargets_genome on ${i}."
-         BL=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.txt
-         BLH=${OUTDIR}/blast_out/${BLAST_TYPE}_`basename ${TARGETS}`_to_${i}_all_contigs.withHeader.txt
-         echo -e "qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqlen\tqstart\tqend\tslen\tsstart\tsend\tevalue\tbitscore" | \
-            cat - ${BL} > ${BLH}
-         
-         Rscript ${VETDIR}/VetTargets_genome.R --blast_file ${BLH} \
-            --output_prefix ${i} \
-            --min_fragment_length ${LENGTH} \
-            --min_pident ${PIDENT} \
-            --max_intron_length 10000 \
-            --max_intron_percent 1 \
-            --min_display_intron 10 \
-            --doPlots ${DO_PLOTS} \
-            --doIntronStats ${DO_INTRON} \
-            --doCovPerChrom ${DO_PER_CHROM} \
-            --multicopyTarget ${MULTI} \
-            --genelist ${DIR}/${GENES} \
-            --blast_type ${BLAST_TYPE}
-      fi
+      run_blast ${i}
    done < ${DIR}/${SAMPLES}
 else
-   run_VetTargets () {
-      local COVSTATS=${OUTDIR}/VetTargets_genome_output/${1}_CoverageStats_AcrossChromosomes.txt
-      if [[ -f ${COVSTATS} ]]; then
+   echo "Running ${BLAST_TYPE} in parallel across samples."
+   env_parallel --env run_blast \
+      --env OUTDIR \
+      --env BLAST_TYPE \
+      --env TARGETS \
+      --env DEDUPE \
+      --env MINIDENTITY \
+      --env EVALUE \
+      -j ${THREADS} "run_blast {}" :::: ${DIR}/${SAMPLES}
+fi
+
+# 3. run VetTargets_genome.R
+mkdir -p ${OUTDIR}/VetTargets_genome_output
+cd ${OUTDIR}/VetTargets_genome_output
+run_VetTargets(){
+      if [[ -f ${OUTDIR}/VetTargets_genome_output/${1}_CoverageStats_AcrossChromosomes.txt ]]; then
          echo "VetTargets_genome coverage stats output exists for ${1}. Skipping."
       else
          echo "Running VetTargets_genome on ${1}."
@@ -290,7 +299,26 @@ else
             --blast_type ${BLAST_TYPE}
       fi
    }
-   parallel -j ${THREADS} "run_VetTargets {}" :::: ${DIR}/${SAMPLES}
+if [[ ${PARALLEL} == "FALSE" ]]; then
+   while read i;do
+      run_VetTargets ${i}
+   done < ${DIR}/${SAMPLES}
+else
+   echo "Running VetTargets_genome.R in parallel across samples."
+   env_parallel --env run_VetTargets \
+      --env OUTDIR \
+      --env BLAST_TYPE \
+      --env TARGETS \
+      --env VETDIR \
+      --env LENGTH \
+      --env PIDENT \
+      --env DO_PLOTS \
+      --env DO_INTRON \
+      --env DO_PER_CHROM \
+      --env MULTI \
+      --env DIR \
+      --env GENES \
+      -j ${THREADS} "run_VetTargets {}" :::: ${DIR}/${SAMPLES}
 fi
 
 # 4. collate CoverageStats_AcrossChromosomes.txt
