@@ -211,8 +211,9 @@ enumerate<-function(x){seq(min(x),max(x),by=1)}
 full_enumeration<-function(x,a,b){do.call(c,sapply(1:nrow(x),function(k){enumerate(x[k,c(a,b)])},simplify = F))}
 full_containment<-function(x,a,b){mean(table(full_enumeration(x,a,b)))}
 
-ThinBlastResult<-function(data){
-  cat("Thinning blast result...\n")
+ThinBlastResult<-function(data,overlap_threshold=0.1){
+  over_thresh<-overlap_threshold+1
+  cat(paste0("Thinning blast result. Using overlap threshold ", overlap_threshold ," to decide if matches are redundant...\n"))
   dat<-data
   dat$pair<-paste0(dat$qseqid,"_",dat$sseqid)
   new.dat<-data.frame()
@@ -225,13 +226,12 @@ ThinBlastResult<-function(data){
     pb$tick()
     dat.thin<-dat[dat$pair==i,] %>% arrange(desc(length))
     dat.thin.containment<-full_containment(dat.thin,"qstart","qend")
-    
-    if(nrow(dat.thin)>1 & dat.thin.containment>=1.1){
+    if(nrow(dat.thin)>1 & dat.thin.containment>=over_thresh){
       kombis<-data.frame(t(combn(1:nrow(dat.thin),m=2)))
       kombis$containment<-sapply(1:nrow(kombis),function(g) full_containment(dat.thin[c(kombis[g,1],kombis[g,2]),],"qstart","qend"))
       kombis$pair<-i
-      if(any(kombis$containment>=1.1)){
-        kombis.todo<-kombis[kombis$containment>=1.1,]
+      if(any(kombis$containment>=over_thresh)){
+        kombis.todo<-kombis[kombis$containment>=over_thresh,]
         kombis.todo$worstscoring_index<-NA
         for(g in 1:nrow(kombis.todo)){
           my_pair<-c(kombis.todo[g,1],kombis.todo[g,2])
@@ -274,19 +274,20 @@ CheckTargets<-function(blast_file,
                        multicopyTarget,
                        genelist,
                        blast_type,
-                       doThin){
+                       doThin,
+                       thinning_threshold){
                          
   # suppressMessages(suppressWarnings(require(tidyverse,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(dplyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(tidyr,quietly=TRUE,warn.conflicts=FALSE)))
   suppressMessages(suppressWarnings(require(progress,quietly=TRUE,warn.conflicts=FALSE)))
 
-  cat("Beginning VetTargets_genome.R...\n")
-  cat("Reading blast file:", blast_file)
+  cat("\nBeginning VetTargets_genome.R...\n")
+  cat("Reading blast file:", blast_file,"\n")
   dat <- as_tibble(read.table(blast_file,header=T))
   if(doThin){
     if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
-      cat("Now thinning BLAST result, which has",nrow(dat),"rows.\n")
+      cat("Now filtering and thinning BLAST result, which has",nrow(dat),"rows.\n")
       cat("BLAST type specified as",blast_type,".\n")
       if(blast_type=="tblastx"){
         cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
@@ -300,7 +301,7 @@ CheckTargets<-function(blast_file,
               length.nuc >= min_fragment_length)
       cat("After removing matches with pident <",min_pident,"and length <",min_fragment_length, "BLAST result has",nrow(dat),"rows.\n")
       cat("Now removing redundant BLAST hits.\n")
-      dat <- ThinBlastResult(dat)
+      dat <- ThinBlastResult(dat,overlap_threshold=thinning_threshold)
       
       write.table(dat,file = paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"),quote = F,row.names = F,col.names = TRUE, sep = "\t" )
       cat("After removing redundant hits, BLAST result has",nrow(dat),"rows.\n")
@@ -410,6 +411,7 @@ p <- add_option(p, c("-M","--multicopyTarget"), help="<does target file contain 
 p <- add_option(p, c("-g","--genelist"), help="<file listing genes to process, excluding any others>",type="character",default=NULL)
 p <- add_option(p, c("-B","--blast_type"), help="<blastn or tblastx? Default=blastn>",type="character",default="blastn")
 p <- add_option(p, c("-T","--doThin"), help="<whether to thin blast results>",type="logical",default=TRUE)
+p <- add_option(p, c("-t","--thinning_threshold"), help="<Blast hits from the same contig to the same target must have this or greater overlap proportion to be cosidered redundant. Default = 0.1.>",type="numeric",default=0.1)
 
 # parse
 args<-parse_args(p)
@@ -432,7 +434,9 @@ if(is.null(args$blast_file)){
                    multicopyTarget = args$multicopyTarget,
                    genelist = args$genelist,
                    blast_type = args$blast_type,
-                   doThin = args$doThin))
-  cat("VetTargets_genome.R is done!\n")
+                   doThin = args$doThin,
+                   thinning_threshold = args$thinning_threshold
+  ))
+  cat("\n*** VetTargets_genome.R finished! ***\n#############################################\n\n")
 }
 
