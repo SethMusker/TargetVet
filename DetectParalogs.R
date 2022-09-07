@@ -1,13 +1,17 @@
 
-DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=NULL,residual_cutoff){
+DetectParalogs<-function(samples,directory,outdir,force,
+                         phylogeny=NULL,ingroup=NULL,
+                         residual_cutoff,
+                         heatmap_text_cex_row=NULL,
+                         heatmap_text_cex_column=NULL){
   
   cat("Beginning DetectParalogs with the following parameters:\n")
   cat("Samples list:\t",samples,"\n")
   cat("VetTargets_genome results directory:\t",directory,"\n")
   cat("Output directory:\t",outdir,"\n")
   cat("Force overwrite of existing results in output directory?:\t",force,"\n")
-  cat("input phylogeny:\t",phylogeny,"\n")
-  cat("ingroup samples:\t",ingroup,"\n")
+  if(!is.null(phylogeny)) cat("input phylogeny:\t",phylogeny,"\n")
+  if(!is.null(ingroup)) cat("ingroup samples:\t",ingroup,"\n")
   cat("\n###-------------------------------------------------###\n\n")
   
   
@@ -16,10 +20,10 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
       stop("Specified output directory exists.\nTerminating. Use -f TRUE to overwrite.\n")
     }else{
       cat("Specified output directory exists.\n")
-      cat("Will overwrite. (If it fails it's because the output file is open on your computer somewhere. Close  and rerun.)\n")
+      cat("Will overwrite. (If it fails it might be because the one of the output files is open on your computer somewhere. Close and rerun.)\n")
     }
   }else{
-    cat("Specified output directory exists NOT. Will attempt to create it.\n")
+    cat("Specified output directory does not exist. Will attempt to create it.\n")
     dir.create(outdir,recursive=TRUE)
   }
   
@@ -36,17 +40,33 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   out$qseqid<-as.factor(out$qseqid)
   out<-as_tibble(out)
   
+  # refactor levels based on paralogy mean
   out_meanSort<-out %>%
     mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) 
-  # %>% arrange(paralog_percent_ignoreMissing)
-  
-  #get the order and do segmented
+
+  #get the order
   out_meanSort$orderMean<-sapply(out_meanSort$qseqid,function(x) {
     y<-which(levels(out_meanSort$qseqid)==x)
     return(y)})
   
   out_meanSort<-out_meanSort %>% 
     arrange(orderMean)
+  
+  ## sort out heatmap axis text sizes ##
+  n_samp<-length(unique(out_meanSort$Sample))
+  n_gene<-length(unique(out_meanSort$qseqid))
+  
+  if(is.null(heatmap_text_cex_row)){
+    # heatmap_text_cex_row<-max(c(1,20/n_samp))
+    heatmap_text_cex_row<-0.2 + 1/log10(n_samp)
+  }
+  cat(paste0("Using heatmap text size for samples = ",signif(heatmap_text_cex_row,3),".\n"))
+  
+  if(is.null(heatmap_text_cex_column)){
+    # heatmap_text_cex_column<-max(c(1,40/n_gene))
+    heatmap_text_cex_column<-0.2 + 1/log10(n_gene)
+  }
+  cat(paste0("Using heatmap text size for genes = ",signif(heatmap_text_cex_column,3),".\n"))
   
   ## do piecewise constant aka step-function model (package 'cumSeg')
   cat("Fitting piecewise constant a.k.a step-function model with # breakpoints = 1.\n")
@@ -261,9 +281,6 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_line(aes(x=x,y=y),data=nplr_mod_estimates,size=1.5,col="#D41159")+ # nplr fit
     geom_line(aes(x=x,y=y.025),data=nplr_mod_estimates,colour="#D41159",lty=3,size=1)+ # lower CI
     geom_line(aes(x=x,y=y.975),data=nplr_mod_estimates,colour="#D41159",lty=3,size=1)+ # upper CI
-    # geom_vline(xintercept = inflexion_estimates$x,lty=2,size=1,col="#D41159")+ 
-    # geom_vline(xintercept = inflexion_estimates$x.025,lty=2,colour="#D41159",size=1)+
-    # geom_vline(xintercept = inflexion_estimates$x.975,lty=2,colour="#D41159",size=1)+
     geom_segment(aes(x = x,xend=x,y=0,yend=100),
                  data=inflexion_estimates,
                  lty=2,
@@ -342,8 +359,9 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=paralog_percent_ignoreMissing))+
     scale_fill_viridis_c("Paralogy (%)",option="D")+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
-  ggsave(paste0(outdir,"/Paralogy_heatmap.pdf"),width=28,height=20,units="cm")
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=2),
+          axis.text.y=element_text(size=2))
+  ggsave(paste0(outdir,"/Paralogy_heatmap.pdf"),width=40,height=20,units="cm")
   
   # Clustered heatmap using gplots (heatmap2()) and dendextend
   out_mat_samp_misscode<-out_meanSort %>% 
@@ -370,17 +388,18 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   out_mat_mat<-as.data.frame(out_mat_samp)
   rownames(out_mat_mat)<-out_mat_mat$Sample
   out_mat_mat<-out_mat_mat[,-1]
-  pdf(paste0(outdir,"/Paralogy_heatmap_clustered.pdf"),width=40,height=20)
+  
+  pdf(paste0(outdir,"/Paralogy_heatmap_clustered.pdf"),width=40,height=30)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::viridis(100)),
             Rowv = Rowv, Colv = Colv, 
-            cexRow = 1 + 1/log10(nrow(out_mat_mat)),
-            cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
-            keysize = 0.75,
-            margins=c(10,30),
+            cexRow = heatmap_text_cex_row,
+            cexCol = heatmap_text_cex_column,
+            keysize = 0.5,
+            margins=c(10,20),
             key.title = "",
             key.xlab = "Paralogy (%)",
-            key.par=list(cex.lab=3),
+            key.par=list(cex.lab=5),
             adjRow = c(0,0.5),
             adjCol = c(1,0.5), ## TODO: Need to fix these!
             offsetRow = 0,
@@ -407,19 +426,19 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                               by="tipnames")
     # we make a matrix with rows following the order in which the samples appear in the phylogeny
     out_mat_mat_dendro_order<-out_mat_mat[match(dendromatnames$tipnames,rownames(out_mat_mat)),]
-    pdf(paste0(outdir,"/Paralogy_heatmap_clustered_phylogeny.pdf"),width=40,height=20)
+    pdf(paste0(outdir,"/Paralogy_heatmap_clustered_phylogeny.pdf"),width=40,height=30)
     heatmap.2(as.matrix(out_mat_mat_dendro_order),
               Rowv = dend_initial.ord,
               Colv = Colv,
               scale = "none", col = c(viridisLite::viridis(100)),
               trace = "none", density.info = "none",
-              cexRow = 1 + 1/log10(nrow(out_mat_mat)),
-              cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
-              keysize = 0.75,
-              margins=c(10,30),
+              cexRow = heatmap_text_cex_row,
+              cexCol = heatmap_text_cex_column,
+              keysize = 0.5,
+              margins=c(10,20),
               key.title = "",
               key.xlab = "Paralogy (%)",
-              key.par=list(cex.lab=2),
+              key.par=list(cex.lab=5),,
               adjRow = c(0,0.5),
               adjCol = c(0,0.5),
               offsetRow = 0,
@@ -446,8 +465,9 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=paralogy_index_ignoreMissing))+
     scale_fill_viridis_c("Copy number",option="D")+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
-  ggsave(paste0(outdir,"/Copy_number_heatmap.pdf"),width=28,height=20,units="cm")
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=2),
+          axis.text.y=element_text(size=2))
+  ggsave(paste0(outdir,"/Copy_number_heatmap.pdf"),width=40,height=20,units="cm")
   
   # Clustered heatmap using gplots (heatmap2()) and dendextend
   out_mat_samp_misscode<-out_meanSort %>% select(qseqid,Sample,paralogy_index_ignoreMissing) %>%
@@ -472,17 +492,17 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   out_mat_mat<-as.data.frame(out_mat_samp)
   rownames(out_mat_mat)<-out_mat_mat$Sample
   out_mat_mat<-out_mat_mat[,-1]
-  pdf(paste0(outdir,"/Copy_number_heatmap_clustered.pdf"),width=40,height=20)
+  pdf(paste0(outdir,"/Copy_number_heatmap_clustered.pdf"),width=40,height=30)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::viridis(100)),
             Rowv = Rowv, Colv = Colv, 
-            cexRow = 1 + 1/log10(nrow(out_mat_mat)),
-            cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
-            keysize = 0.75,
-            margins=c(10,30),
+            cexRow = heatmap_text_cex_row,
+            cexCol = heatmap_text_cex_column,
+            keysize = 0.5,
+            margins=c(10,20),
             key.title = "",
             key.xlab = "Copy number",
-            key.par=list(cex.lab=2),
+            key.par=list(cex.lab=5),,
             adjRow = c(0,0.5),
             adjCol = c(1,0.5),
             offsetRow = 0,
@@ -498,9 +518,10 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
     scale_fill_viridis_c("Missingness (%)",option="magma",direction=1)+
     labs(x="Target")+
-    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=5))
-  ggsave(paste0(outdir,"/Missingness_heatmap.pdf"),width=28,height=20,units="cm")
-  # Clustered heatmap using gplots (heatmap2()) and dendextend
+    theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=2),
+          axis.text.y=element_text(size=2))
+  ggsave(paste0(outdir,"/Missingness_heatmap.pdf"),width=40,height=20,units="cm")
+  # Clustered heatmap using gplots (heatmap.2()) and dendextend
   out_mat_samp<-out_meanSort %>% select(qseqid,Sample,missing_percent) %>%
     pivot_wider(names_from = qseqid ,values_from = missing_percent, 
                 values_fill = 100)
@@ -518,17 +539,17 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
   #   set("branches_lwd", 1.2) %>%
   #   dendextend::ladderize()
   
-  pdf(paste0(outdir,"/Missingness_heatmap_clustered.pdf"),width=40,height=20)
+  pdf(paste0(outdir,"/Missingness_heatmap_clustered.pdf"),width=40,height=30)
   heatmap.2(as.matrix(out_mat_mat), scale = "none", trace = "none", density.info = "none",
             col = c(viridisLite::magma(100)),
             Rowv = Rowv, Colv = Colv, 
-            cexRow = 1 + 1/log10(nrow(out_mat_mat)),
-            cexCol = 0.1+1/sqrt(nrow(out_mat_mat)),
-            keysize = 0.75,
-            margins=c(10,30),
+            cexRow = heatmap_text_cex_row,
+            cexCol = heatmap_text_cex_column,
+            keysize = 0.5,
+            margins=c(10,20),
             key.title = "",
             key.xlab = "Missingness (%)",
-            key.par=list(cex.lab=2),
+            key.par=list(cex.lab=5),,
             adjRow = c(0,0.5),
             adjCol = c(1,0.5),
             offsetRow = 0,
@@ -543,7 +564,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     ggplot(aes(x=Sample,y=missing_percent))+
     theme_bw()+
     geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
+    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
     labs(y="Missingness(%)",x="Sample")+
     ggtitle("All targets.")
   ggsave(paste0(outdir,"/Missingness_boxplot_samplewise.pdf"),width=30,units = "cm")
@@ -554,7 +575,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     ggplot(aes(x=Sample,y=missing_percent))+
     theme_bw()+
     geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
+    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
     labs(y="Missingness(%)",x="Sample")+
     ggtitle("Putative paralogs removed.")
   ggsave(paste0(outdir,"/Missingness_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
@@ -565,7 +586,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     ggplot(aes(x=Sample,y=paralog_percent_ignoreMissing))+
     theme_bw()+
     geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
+    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
     labs(y="Paralog Rate (%)",x="Sample")+
     ggtitle("All targets.")
   ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise.pdf"),width=30,units = "cm")
@@ -576,7 +597,7 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     ggplot(aes(x=Sample,y=paralog_percent_ignoreMissing))+
     theme_bw()+
     geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1))+
+    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
     labs(y="Paralog Rate (%)",x="Sample")+
     ggtitle("Putative paralogs removed.")
   ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
@@ -593,14 +614,14 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     geom_point(aes(x=Sample,y=Mean_residual_paralogy),data=resid_model_coefs,colour="red")+
     theme_bw()+
     labs(y="Obs - Exp paralogy (%)",x="Sample") +
-    theme(axis.text.x = element_text(angle = 90,size=5.5,vjust=0.5,hjust=1),
+    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1),
           panel.grid =element_blank())
   ggsave(paste0(outdir,"/Paralogy_residuals_boxplot_samplewise.pdf"),width=30,units = "cm")
   
   
   # Ingroup stuff #
   if(is.null(ingroup)){
-    cat("No ingroup provided. Moving on.\n")
+    # cat("No ingroup provided. Moving on.\n")
   }else{
     cat("Using ingroup list from",ingroup,"for ingroup-specific paralog identification.\n")
     ingr<-suppressMessages(scan(ingroup,what="character"))
@@ -673,8 +694,9 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
                 mean_missing_percent=round(mean(missing_percent),1),
                 mean_paralogy_index=round(mean(paralogy_index),2),
                 mean_paralogy_index_ignoreMissing=round(mean(paralogy_index_ignoreMissing),2),
-                diagnosis=ifelse(unique(orderMean)<=nplr_mod.psi,"Single","Paralog"),
-                .groups="keep")
+                #diagnosis=ifelse(unique(orderMean)<=nplr_mod.psi,"Single","Paralog"),
+                diagnosis=ifelse(orderMean<=nplr_mod.psi,"Single","Paralog"),
+                .groups="keep") %>% unique()
   write.table(out_meanSort_summary,paste0(outdir,"/DetectParalogs_results_summarised.csv"),
               quote=F,row.names=F,sep=",")
   cat("Using all samples -- Identified",sum(out_meanSort_summary$diagnosis=="Paralog"),"paralogs!\n")
@@ -686,7 +708,11 @@ DetectParalogs<-function(samples,directory,outdir,force,phylogeny=NULL,ingroup=N
     write.table(paste0(outdir,"/SingleCopy_list.csv"),
                 quote=F,row.names=F,col.names=F,sep=",")
   
-  cat("\nDetectParalogs.R finished!\n")
+  cat("\n*** DetectParalogs finished! ***\n")
+  sink(paste0(outdir,"/Warnings.txt"))
+  warnings()
+  sink()
+  cat("Warnings are written to warnings.txt. These are usually harmless (but check for errors).\n")
   
 }
 
@@ -704,6 +730,8 @@ p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdi
 p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)
 p <- add_option(p, c("-i","--ingroup"), help="<File listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). \nA separate paralog detection analysis will be conducted using only the ingroup samples.>",type="character",default=NULL)
 p <- add_option(p, c("-r","--residual_cutoff"), help="<How to identify anomalous samples? If their absolute mean observed minus expected paralogy exceeds this value. See documentation for details.>",type="numeric",default=10)
+p <- add_option(p, c("--heatmap_text_cex_row"), help="<size scaling factor for row (gene) names text in clustered heatmaps. Default = NULL (automatically calculated, often badly)>",type="numeric",default=NULL)
+p <- add_option(p, c("--heatmap_text_cex_column"), help="<size scaling factor for column (sample) names text in clustered heatmaps. Default = NULL (automatically calculated, often badly)>",type="numeric",default=NULL)
 # parse
 args<-parse_args(p)
 
@@ -733,12 +761,9 @@ try(DetectParalogs(samples = args$samples,
                    force = args$force,
                    phylogeny = args$phylogeny,
                    ingroup = args$ingroup,
-                   residual_cutoff=args$residual_cutoff))
-
-sink(paste0(args$outdir,"/Warnings.txt"))
-warnings()
-sink()
-cat("Warnings are written to warnings.txt. These are usually harmless.\n")
+                   residual_cutoff = args$residual_cutoff,
+                   heatmap_text_cex_row = args$heatmap_text_cex_row,
+                   heatmap_text_cex_column = args$heatmap_text_cex_column))
 
 
 

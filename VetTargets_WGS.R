@@ -98,7 +98,7 @@ suppressMessages(suppressWarnings(require(optparse)))
 p <- OptionParser(usage="Vet your targets by identifying loci with low/null, roughly expected, and greater than expected median coverage.\n
                 Requires the following packages: tidyverse, Biostrings, segmented, optparse\n
                 Run using Rscript, e.g.\n
-                Rscript VetTargets.R --cov 1st_BAM_to_myTARGETS.coverage,2nd_BAM_to_myTARGETS.coverage --target myTARGETS.fasta --out myTARGETS_filtered")
+                Rscript VetTargets_WGS.R --cov 1st_BAM_to_myTARGETS.coverage,2nd_BAM_to_myTARGETS.coverage --target myTARGETS.fasta --out myTARGETS_filtered")
 # Add a positional argument
 p <- add_option(p, c("-c","--cov"), help="REQUIRED coverage file(s) output by map_WGS_to_targets.sh or made by you\n(if so, make sure it has all sites included - e.g. by using samtools depth -a)\nif you have coverage files for >1 species/sample, just write them all in here, comma separated (NO SPACES)")
 p <- add_option(p, c("-t","--target"), help="REQUIRED target file used as the reference for the coverage calculation")

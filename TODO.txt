@@ -1,3 +1,5 @@
 
-Make R script to install dependencies in a local library if they aren't already.
+1. Make R script to install dependencies in a local library if they aren't already.
+2. Implement an option in VetHybPiper.sh to skip collating and instead run individual
+    blast searches for each target using only the contigs assembled for it.
 
