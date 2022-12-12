@@ -49,14 +49,14 @@ BBMap suite (https://sourceforge.net/projects/bbmap/) # for VetHybPiper.sh, opti
 All of the wrapper scripts (*.sh) require linux OS.
 ```
 
-# Identify paralogs from HybPiper: **`VetHybPiper.sh`**
+# Identify paralogs from HybPiper output: **`VetHybPiper.sh`**
 This script is designed as an easy-to-use wrapper around several TargetVet scripts with the aim of automated identification of paralogs in HybPiper-assembled target capture data. It also produces detailed summary tables (so you can apply your own filtering and paralog-detection methods), as well as nice figures that help you visualise patterns of paralogy and missingness in your assemblies, across all genes and samples.
 
 The script runs using Bash, the standard shell-scripting language on Linux systems. You can see the available options by running `bash VetHybPiper.sh -h`. The 6 minimum required arguments are all things (mostly files) that you'll already have in your HybPiper directory, so you won't have to do anything new before running this. 
 
 You will need to have the BLAST+ bin in your path.
 
-Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I have found that HybPiper contigs often contain two (or more) **near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores**. This is possibly because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and therefore assembles each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
+Apart from the above dependencies, there is the optional added dependency of `dedupe.sh` from the BBMap suite. I have found that HybPiper contigs often contain two (or more) near-identical copies of the same sequence for many genes, leading to anomalously high paralogy scores. This is possibly because HybPiper is hard-coded to use the 'careful' mode of the SPAdes assembler and therefore assembles each haplotype of the same region separately, rather than collapsing them into a 'consensus' contig. Using `dedupe.sh` by setting `-d TRUE` with the default minimum percent identity threshold of 97 (which can be changed, e.g. `-m 98`) considerably reduces noise in the data sets I've tested and improves paralog detection accuracy.
 
 By default `blastn` is used, but if your targets are quite divergent from your samples you may wish to use `tblastx` for more sensitive querying (set `-B tblastx`). However, note that because of the evaluation of all possible reading frames, this option produces many more redundant hits (i.e. within-contig matches to essentially the same part of the target) than `blastn`. I have implemented an effective 'thinning' algorithm in `VetTargets_genome.R` for removing these redundancies, but it can add a bit of time to the overall analysis (around 1 to 2 minutes per sample).
 

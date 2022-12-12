@@ -1,6 +1,7 @@
 
 DetectParalogs<-function(samples,directory,outdir,force,
                          phylogeny=NULL,ingroup=NULL,
+                         genelist=NULL,
                          residual_cutoff,
                          heatmap_text_cex_row=NULL,
                          heatmap_text_cex_column=NULL){
@@ -38,11 +39,19 @@ DetectParalogs<-function(samples,directory,outdir,force,
   }
   out$Sample<-as.factor(out$Sample)
   out$qseqid<-as.factor(out$qseqid)
+
+  if(!is.null(genelist)){
+    gl <- suppressMessages(scan(genelist,what="character"))
+    out <- out[out$qseqid %in% gl,]
+    if(nrow(out)==0) stop("After filtering out genes not present in the provided gene list, nothing remains! Check the names match.\n")
+  }
+
   out<-as_tibble(out)
   
   # refactor levels based on paralogy mean
   out_meanSort<-out %>%
-    mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean)) 
+    mutate(qseqid=fct_reorder(qseqid,paralog_percent_ignoreMissing,mean),
+           Sample=fct_reorder(Sample,paralog_percent_ignoreMissing,mean)) 
 
   #get the order
   out_meanSort$orderMean<-sapply(out_meanSort$qseqid,function(x) {
@@ -94,8 +103,13 @@ DetectParalogs<-function(samples,directory,outdir,force,
   
   ## Rather define psi as NP50 (x at which line crosses y=50%)
   nplr_mod.psi<-getEstimates(nplr_mod,0.5)$x
-  cat("NP50 estimate =",round(nplr_mod.psi,0),"meaning the n-parameter logistic regression estimated number of paralogs is\n\t",
-      max(out_meanSort$orderMean),"-",round(nplr_mod.psi,0),"=",max(out_meanSort$orderMean)-round(nplr_mod.psi,0),".\n")
+  if (nplr_mod.psi>max(out_meanSort$orderMean)) {
+    cat("NP50 estimate =",nplr_mod.psi,"which is >",max(out_meanSort$orderMean),"(total number of genes), meaning the n-parameter logistic regression estimated number of paralogs is 0\n")
+    nplr_mod.psi <- max(out_meanSort$orderMean)
+  }else{
+    cat("NP50 estimate =",round(nplr_mod.psi,0),"meaning the n-parameter logistic regression estimated number of paralogs is\n\t",
+    max(out_meanSort$orderMean),"-",round(nplr_mod.psi,0),"=",max(out_meanSort$orderMean)-round(nplr_mod.psi,0),".\n")
+  }
   
   ## find anomalous samples based on how well they conform to the overall paralogy patterns
   ## get the predicted values of the overall model
@@ -133,17 +147,19 @@ DetectParalogs<-function(samples,directory,outdir,force,
   
   ## fit separate nplr models to each sample, check for concordance of inflexion estimates
   get_np_fit<-function(x,y){
-    mod_temp<-suppressMessages(nplr(x=x,
+    mod_temp<-try(suppressMessages(nplr(x=x,
                                     y=y/100,
                                     npars = "all",
-                                    useLog = F))
-    newx <- getXcurve(mod_temp)
-    newy <- getYcurve(mod_temp)
-    para_quarts<-getEstimates(mod_temp,c(0.25,0.5,0.75))[,c(1,3)]
-    if(any(para_quarts$y != c(0.25,0.5,0.75))){
-      cat("Curve does not pass through some quartiles. Setting estimates to NA.\n")
-      para_quarts$y<-c(0.25,0.5,0.75)
-      para_quarts$x<-NA
+                                    useLog = F)))
+    if(!inherits(mod_temp, "try-error")){
+      newx <- getXcurve(mod_temp)
+      newy <- getYcurve(mod_temp)
+      para_quarts<-getEstimates(mod_temp,c(0.25,0.5,0.75))[,c(1,3)]
+      if(any(para_quarts$y != c(0.25,0.5,0.75))){
+        cat("Curve does not pass through some quartiles. Setting estimates to NA.\n")
+        para_quarts$y<-c(0.25,0.5,0.75)
+        para_quarts$x<-NA
+      }
     }
     
     return(list(curves=data.frame(x=newx,y=newy*100),
@@ -159,11 +175,14 @@ DetectParalogs<-function(samples,directory,outdir,force,
       arrange(paralog_percent_ignoreMissing)
   }
   cat("Now fitting nplr models separately to each sample.\n")
-  myfits<-lapply(out_meanSort_sampleSplit,function(S) get_np_fit(x=S$orderMean,y=S$paralog_percent_ignoreMissing))
-  mycurves<-lapply(myfits,function(x) return(x$curves))
-  myinflexions<-lapply(myfits,function(x) return(x$inflexions[1][,1]))
-  myinflexions_y<-lapply(myfits,function(x) return(x$inflexions[2][,1]*100))
-  myNP50<-lapply(myfits,function(x) return(x$paralogy_quartiles[2,"x"]))
+  myfits<-lapply(out_meanSort_sampleSplit,function(S) try(get_np_fit(x=S$orderMean,y=S$paralog_percent_ignoreMissing)))
+  # print(myfits)
+  # print(lapply(myfits,class))
+  # print(unlist(lapply(myfits,function(x)!inherits(x,"try-error"))))
+  mycurves<-lapply(myfits,function(x) try(return(x$curves)))
+  myinflexions<-lapply(myfits,function(x) try(return(x$inflexions[1][,1])))
+  myinflexions_y<-lapply(myfits,function(x) try(return(x$inflexions[2][,1]*100)))
+  myNP50<-lapply(myfits,function(x) try(return(x$paralogy_quartiles[2,"x"])))
   
   # TODO: use quartiles, esp. median i.e. where line crosses 50% paralogy, instead of inflexion points
   # how to deal with flat curves? --  for now, set estimates to NA. We anyway do the residual analysis to find outliers.
@@ -234,7 +253,7 @@ DetectParalogs<-function(samples,directory,outdir,force,
   inflexions_df$plot_point_x<-ifelse(inflexions_df$NP50 > max(out_meanSort$orderMean),
                                      yes=max(out_meanSort$orderMean),
                                      no=ifelse(inflexions_df$NP50 < 1,1,inflexions_df$NP50)) # plot points at their NP50
-  inflexions_df$plot_point_x[is.na(inflexions_df$plot_point_x)]<-max(out_meanSort$orderMean)/2
+  inflexions_df$plot_point_x[is.na(inflexions_df$plot_point_x)]<-max(out_meanSort$orderMean)/2 # put samplenames in the middle of the plot if they have NA NP50
   inflexions_df$plot_point_y<-NA
   for(i in inflexions_df$Sample){
     inflexions_df[inflexions_df$Sample==i,]$plot_point_y<-ifelse(inflexions_df[inflexions_df$Sample==i,]$inflexion_y <= 100 & inflexions_df[inflexions_df$Sample==i,]$inflexion_y > 0,
@@ -399,7 +418,7 @@ DetectParalogs<-function(samples,directory,outdir,force,
             margins=c(10,20),
             key.title = "",
             key.xlab = "Paralogy (%)",
-            key.par=list(cex.lab=5),
+            key.par=list(cex.lab=4),
             adjRow = c(0,0.5),
             adjCol = c(1,0.5), ## TODO: Need to fix these!
             offsetRow = 0,
@@ -438,7 +457,7 @@ DetectParalogs<-function(samples,directory,outdir,force,
               margins=c(10,20),
               key.title = "",
               key.xlab = "Paralogy (%)",
-              key.par=list(cex.lab=5),,
+              key.par=list(cex.lab=4),
               adjRow = c(0,0.5),
               adjCol = c(0,0.5),
               offsetRow = 0,
@@ -502,7 +521,7 @@ DetectParalogs<-function(samples,directory,outdir,force,
             margins=c(10,20),
             key.title = "",
             key.xlab = "Copy number",
-            key.par=list(cex.lab=5),,
+            key.par=list(cex.lab=4),
             adjRow = c(0,0.5),
             adjCol = c(1,0.5),
             offsetRow = 0,
@@ -513,7 +532,8 @@ DetectParalogs<-function(samples,directory,outdir,force,
   ###############
   # missingness #
   ###############
-  out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean)) %>% 
+  out_meanSort %>% mutate(qseqid=fct_reorder(qseqid,missing_percent,mean),
+                          Sample=fct_reorder(Sample,missing_percent,mean)) %>% 
     ggplot()+
     geom_raster(aes(x=qseqid,y=Sample,fill=missing_percent))+
     scale_fill_viridis_c("Missingness (%)",option="magma",direction=1)+
@@ -549,7 +569,7 @@ DetectParalogs<-function(samples,directory,outdir,force,
             margins=c(10,20),
             key.title = "",
             key.xlab = "Missingness (%)",
-            key.par=list(cex.lab=5),,
+            key.par=list(cex.lab=4),
             adjRow = c(0,0.5),
             adjCol = c(1,0.5),
             offsetRow = 0,
@@ -724,14 +744,16 @@ p <- OptionParser(usage=" This script will take the CoverageStats output of VetT
                         many samples and detect paralogs in a targeted set of genes. ")
 # Add a positional arguments
 p <- add_option(p, c("-s","--samples"), help="<Required: file listing sample names, one per line>",type="character")
-p <- add_option(p, c("-d","--directory"), help="<Required: directory with output from VetTargets_genome.R>",type="character")
+p <- add_option(p, c("-d","--directory"), help="<Required: directory with outputs from VetTargets_genome.R for each sample>",type="character")
 p <- add_option(p, c("-o","--outdir"), help="<Directory in which to write results. Defaults to ./DetectParalogs_results>",type="character",default=paste0(getwd(),"/DetectParalogs_results"))
 p <- add_option(p, c("-f","--force"), help="<Force overwrite of results in outdir? Default=FALSE>",type="logical",default=FALSE)
 p <- add_option(p, c("-p","--phylogeny"), help="<Rooted tree in Newick format. If provided, will make an additional paralogy heatmap with this tree instead of the cluster dendrogram. All tip labels need to match those in the samples file.>",type="character",default=NULL)
 p <- add_option(p, c("-i","--ingroup"), help="<File listing 'ingroup' samples. This is useful if you have several outgroup taxa, which often have different paralogy patterns (especially if they were used to design the target set). \nA separate paralog detection analysis will be conducted using only the ingroup samples.>",type="character",default=NULL)
+p <- add_option(p, c("-g","--genelist"), help="<File listing genes to process, excluding any others>",type="character",default=NULL)
 p <- add_option(p, c("-r","--residual_cutoff"), help="<How to identify anomalous samples? If their absolute mean observed minus expected paralogy exceeds this value. See documentation for details.>",type="numeric",default=10)
 p <- add_option(p, c("--heatmap_text_cex_row"), help="<size scaling factor for row (gene) names text in clustered heatmaps. Default = NULL (automatically calculated, often badly)>",type="numeric",default=NULL)
 p <- add_option(p, c("--heatmap_text_cex_column"), help="<size scaling factor for column (sample) names text in clustered heatmaps. Default = NULL (automatically calculated, often badly)>",type="numeric",default=NULL)
+p <- add_option(p, c("--do_nplr"), help="<Whether to run n-parameter logistic regression.",type="logical",default=TRUE)
 # parse
 args<-parse_args(p)
 
@@ -761,6 +783,7 @@ try(DetectParalogs(samples = args$samples,
                    force = args$force,
                    phylogeny = args$phylogeny,
                    ingroup = args$ingroup,
+                   genelist=args$genelist,
                    residual_cutoff = args$residual_cutoff,
                    heatmap_text_cex_row = args$heatmap_text_cex_row,
                    heatmap_text_cex_column = args$heatmap_text_cex_column))

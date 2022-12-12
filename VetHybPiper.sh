@@ -18,6 +18,7 @@ usage () {
    #  -M LOGICAL. Does the target fasta contain multiple copies per gene (TRUE or FALSE)? If TRUE, gene names in the target fasta must follow HybPiper convention, E.g. Artocarpus-gene001 and Morus-gene001 are the same gene. (Note: The gene names file (-G) must still have just the gene names, i.e. gene001, for example.)
    
    ##--- The following arguments are OPTIONAL.
+   #  -A LOGICAL. Is the target fasta amino acid? If TRUE, blastx will be used and -B will be ignored. Default = FALSE.
    #  -B What type of BLAST to use? Options currently are blastn or tblastx. The latter is potentially more sensitive but also much more time-consuming. Default = blastn.
    #  -s LOGICAL. Whether to blast each target's contigs to it separately. 
    #     Much slower (use -X TRUE to speed it up) but it should be used 
@@ -26,6 +27,7 @@ usage () {
    #  -E What e-value to use as a cutoff for keeping matches in blast results. Default = 1e-6.
    #  -L Minimum length of blast matches to keep for analysis. Default = 150bp.
    #  -K Minimum percent identity (pident) of blast matches to Keep for analysis. Default = 70.
+   #  -N Blast hits from the same contig to the same target must have this or greater overlap proportion to be considered redundant. Default = 0.1.
    #  -I LOGICAL. Do IntronStats? default = TRUE
    #  -F LOGICAL. Force overwrite of DetectParalogs.R output? default = FALSE
    #  -C LOGICAL. Do per-chromosome/scaffold stats? default = TRUE
@@ -60,8 +62,10 @@ PARALLEL=FALSE
 THREADS=1
 EVALUE=1e-6
 SEPARATE=FALSE
+AMINO=FALSE
+THINNING_THRESHOLD=0.1
 ## parse args
-while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B:X:t:E:s: option
+while getopts V:D:T:S:G:L:K:I:C:d:m:O:M:F:i:p:P:B:X:t:E:s:A:N: option
 do
 case "${option}"
 in
@@ -84,15 +88,21 @@ i) INGROUP=${OPTARG};;
 p) PHYLO=${OPTARG};;
 P) DO_PLOTS=${OPTARG};;
 B) BLAST_TYPE=${OPTARG};;
+A) AMINO=${OPTARG};;
 E) EVALUE=${OPTARG};;
 X) PARALLEL=${OPTARG};;
 t) THREADS=${OPTARG};;
 s) SEPARATE=${OPTARG};;
+N) THINNING_THRESHOLD=${OPTARG};;
 
 esac
 done
 
 echo "Starting VetHybPiper.sh."
+
+if [[ ${AMINO} == "TRUE" ]];then
+   BLAST_TYPE=blastx
+fi
 
 # Check that things will run.
 
@@ -110,8 +120,13 @@ if [[ ${DEDUPE} == "TRUE" ]] && [[ $(which dedupe.sh | wc -l) -eq 0 ]]; then
    echo -e "You can add it to your path by running \nexport PATH='\$PATH:path/to/BBMap-or-BBTools'"
    echo "Exiting."
    exit
-   #echo "Setting parallel to FALSE and proceeding."
-   #PARALLEL=FALSE
+fi
+
+if [[ $(which ${BLAST_TYPE} | wc -l) -eq 0 ]]; then
+   echo "BLAST does not seem to be in your PATH."
+   echo -e "You can add it to your path by running \nexport PATH='\$PATH:path/to/ncbi-blast'"
+   echo "Exiting."
+   exit
 fi
 
 if [[ ${PARALLEL} == "TRUE" ]] && [[ ${THREADS} -eq 1 ]]; then
@@ -204,7 +219,7 @@ if [[ $CRLF -eq 1 ]]; then
    SAMPLES=${SAMPLES}.CRLF-corrected.txt 
 fi
 
-
+# If SEPARATE = FALSE, do loops
 if [[ ${SEPARATE} == "FALSE" ]];then
    # 1. make TargetVet results folder and collate spades contigs per sample
    mkdir -p ${OUTDIR}/assemblies_collated
@@ -223,7 +238,6 @@ if [[ ${SEPARATE} == "FALSE" ]];then
                fi
                cat ${DIR}/${i}/${1}/${1}_contigs.fasta
             }
-            # export -f cat_contigs
             echo "Collating contigs in parallel for sample ${i}."
             env_parallel --env cat_contigs \
                --env DIR \
@@ -266,7 +280,14 @@ if [[ ${SEPARATE} == "FALSE" ]];then
             local SUBJECT=${OUTDIR}/assemblies_collated/${1}_all_contigs.fasta
          fi
 
-         if [[ ${BLAST_TYPE} == "tblastx" ]]; then
+         if [[ ${BLAST_TYPE} == "blastx" ]]; then
+            echo "Target file is amino acid. Mapping contigs to targets using blastx for ${1}."
+            blastx -query ${DIR}/${TARGETS} \
+               -subject ${SUBJECT} \
+               -out ${BLASTOUT} \
+               -evalue ${EVALUE} \
+               -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore"
+         elif [[ ${BLAST_TYPE} == "tblastx" ]]; then
             echo "Mapping contigs to targets using tblastx for ${1}."
             tblastx -query ${DIR}/${TARGETS} \
                -subject ${SUBJECT} \
@@ -287,8 +308,7 @@ if [[ ${SEPARATE} == "FALSE" ]];then
    if [[ ${PARALLEL} == "FALSE" ]]; then
       while read i;do
          run_blast ${i}
-      done < ${DIR}/${
-	  }
+      done < ${DIR}/${SAMPLES}
    else
       echo "Running ${BLAST_TYPE} in parallel across samples."
       env_parallel --env DIR \
@@ -336,7 +356,13 @@ else
       # local CURRENT_GENE_CONTIGS=${DIR}/${i}/${1}/${1}_contigs.fasta
       if [[ -f ${DIR}/${i}/${1}/${1}_contigs.fasta ]];then
          if [[ ! -f ${TEMP}/${BLAST_TYPE}_${i}_to_${1}.txt ]]; then
-            if [[ ${BLAST_TYPE} == "tblastx" ]]; then
+            if [[ ${BLAST_TYPE} == "blastx" ]]; then
+               blastx -query ${TEMP}/${1}_target.fasta \
+                  -subject ${DIR}/${i}/${1}/${1}_contigs.fasta \
+                  -out ${TEMP}/${BLAST_TYPE}_${i}_to_${1}.txt \
+                  -evalue ${EVALUE} \
+                  -outfmt "6 qseqid sseqid pident length mismatch gapopen qlen qstart qend slen sstart send evalue bitscore" 
+            elif [[ ${BLAST_TYPE} == "tblastx" ]]; then
                tblastx -query ${TEMP}/${1}_target.fasta \
                   -subject ${DIR}/${i}/${1}/${1}_contigs.fasta \
                   -out ${TEMP}/${BLAST_TYPE}_${i}_to_${1}.txt \
@@ -409,7 +435,8 @@ run_VetTargets(){
             --doCovPerChrom ${DO_PER_CHROM} \
             --multicopyTarget ${MULTI} \
             --genelist ${DIR}/${GENES} \
-            --blast_type ${BLAST_TYPE}
+            --blast_type ${BLAST_TYPE} \
+            --thinning_threshold ${THINNING_THRESHOLD}
       fi
    }
 if [[ ${PARALLEL} == "FALSE" ]]; then
@@ -431,6 +458,7 @@ else
       --env MULTI \
       --env DIR \
       --env GENES \
+      --env THINNING_THRESHOLD \
       -j ${THREADS} "run_VetTargets {}" :::: ${DIR}/${SAMPLES}
 fi
 

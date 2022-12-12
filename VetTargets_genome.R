@@ -289,7 +289,7 @@ CheckTargets<-function(blast_file,
     if(!file.exists(paste0(output_prefix,"_",blast_type,"_Thinned_minPident",min_pident,"_minLength",min_fragment_length,".txt"))){
       cat("Now filtering and thinning BLAST result, which has",nrow(dat),"rows.\n")
       cat("BLAST type specified as",blast_type,".\n")
-      if(blast_type=="tblastx"){
+      if(blast_type=="tblastx" | blast_type=="blastx"){
         cat("Multiplying length by 3 to get length in nucleotides rather than amino acids.\n")
         cat("Will remove hits <",min_fragment_length,"nucleotide base pairs long.\n")
         dat$length.nuc<-dat$length*3
