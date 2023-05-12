@@ -5,7 +5,8 @@ DetectParalogs<-function(samples,directory,outdir,force,
                          residual_cutoff,
                          heatmap_text_cex_row=NULL,
                          heatmap_text_cex_column=NULL){
-  
+  source(list.files("functions",pattern=".R"))
+
   cat("Beginning DetectParalogs with the following parameters:\n")
   cat("Samples list:\t",samples,"\n")
   cat("VetTargets_genome results directory:\t",directory,"\n")
@@ -579,49 +580,9 @@ DetectParalogs<-function(samples,directory,outdir,force,
   
   ## Per-sample plots
   #plot missingness
-  out_meanSort %>% 
-    mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
-    ggplot(aes(x=Sample,y=missing_percent))+
-    theme_bw()+
-    geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
-    labs(y="Missingness(%)",x="Sample")+
-    ggtitle("All targets.")
-  ggsave(paste0(outdir,"/Missingness_boxplot_samplewise.pdf"),width=30,units = "cm")
-  
-  out_meanSort %>% 
-    mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
-    filter(orderMean<=nplr_mod.psi) %>%
-    ggplot(aes(x=Sample,y=missing_percent))+
-    theme_bw()+
-    geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
-    labs(y="Missingness(%)",x="Sample")+
-    ggtitle("Putative paralogs removed.")
-  ggsave(paste0(outdir,"/Missingness_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
-  
+  plot_missingness_samplewise()
   # Plot paralogy
-  out_meanSort %>% 
-    mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
-    ggplot(aes(x=Sample,y=paralog_percent_ignoreMissing))+
-    theme_bw()+
-    geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
-    labs(y="Paralog Rate (%)",x="Sample")+
-    ggtitle("All targets.")
-  ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise.pdf"),width=30,units = "cm")
-  
-  out_meanSort %>% 
-    mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>% 
-    filter(orderMean<=nplr_mod.psi) %>%
-    ggplot(aes(x=Sample,y=paralog_percent_ignoreMissing))+
-    theme_bw()+
-    geom_boxplot()+
-    theme(axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1))+
-    labs(y="Paralog Rate (%)",x="Sample")+
-    ggtitle("Putative paralogs removed.")
-  ggsave(paste0(outdir,"/Paralogy_boxplot_samplewise_paralogsRemoved.pdf"),width=30,units = "cm")
-  
+  plot_paralogy_samplewise()
   # # Plot residuals
   out_meanSort %>% 
     mutate(Sample=fct_reorder(Sample,nplr_mod.pred_resid,mean)) %>%

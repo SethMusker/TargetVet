@@ -1,0 +1,12 @@
+tidyr
+dplyr
+forcats
+ggplot2
+ggrepel
+optparse
+progress
+nplr
+cumSeg
+gplots
+ape
+dendextend

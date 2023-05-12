@@ -1,3 +1,10 @@
+# Quickstart
+```
+git clone https://github.com/SethMusker/TargetVet.git
+cd TargetVet
+Rscript install_dependencies.R
+```
+
 # TL;DR
 TargetVet is an R-based toolkit for evolutionary studies (especially phylogenomics) using target capture (aka Hyb-seq) which allows you to use avaliable WGS raw reads, a reference genome, or assembled contigs from target capture sequence data (such as those made by **HybPiper** - https://github.com/mossmatters/HybPiper), to:
  1. Identify putative **paralogs** and **missing genes** using:
